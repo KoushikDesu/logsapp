@@ -22,6 +22,8 @@ __pycache__/
 # Uploads directory contents (preserve folder structure)
 uploads/*
 !uploads/.gitkeep
+server/uploads/*
+!server/uploads/.gitkeep
 
 # System files
 .DS_Store
