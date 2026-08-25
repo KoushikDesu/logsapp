@@ -1,37 +1,30 @@
 /* ============================================================
-   LogsApp — Web Chat (SmartPrep Clean Theme & Components)
+   LogsApp — Ultra-Modern Glassmorphism UI & SmartPrep Tokens
    ============================================================ */
 
 :root {
-  --color-primary: #0d52ce;
-  --color-primary-hover: #0a40a4;
-  --color-primary-light: #eff6ff;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-glow: rgba(37, 99, 235, 0.35);
   --color-accent: #f59e0b;
   --color-success: #10b981;
   --color-error: #ef4444;
 
   --color-bg: #f8fafc;
   --color-surface: #ffffff;
-  --color-surface-hover: #f1f5f9;
   --color-border: #e2e8f0;
   --color-text: #0f172a;
   --color-text-secondary: #334155;
   --color-text-muted: #64748b;
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
   
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-heading: 'Space Grotesk', -apple-system, sans-serif;
 }
 
 .dark {
-  --color-bg: #0b0f19;
-  --color-surface: #111827;
-  --color-surface-hover: #1e293b;
-  --color-border: #1e293b;
+  --color-bg: #070a12;
+  --color-surface: rgba(17, 24, 39, 0.7);
+  --color-border: rgba(255, 255, 255, 0.08);
   --color-text: #f8fafc;
   --color-text-secondary: #94a3b8;
   --color-text-muted: #64748b;
@@ -47,7 +40,81 @@ body {
   user-select: none;
 }
 
-/* Custom Scrollbars */
+/* ─── Ambient Glow Backgrounds ─────────────────────────────── */
+.bg-ambient-dark {
+  background-color: #070a12;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.14) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(245, 158, 11, 0.04) 0px, transparent 60%);
+}
+
+.bg-ambient-light {
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.07) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.05) 0px, transparent 50%);
+}
+
+/* ─── Glassmorphism Panels ─────────────────────────────────── */
+.glass-card-dark {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.4);
+}
+
+.glass-card-light {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.06);
+}
+
+.glass-nav-dark {
+  background: rgba(11, 16, 28, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.glass-nav-light {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: rgba(226, 232, 240, 0.8);
+}
+
+/* ─── Custom Message Bubbles ───────────────────────────────── */
+.bubble-sent {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border-radius: 18px 18px 3px 18px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.bubble-received-dark {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px 18px 18px 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.bubble-received-light {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px 18px 18px 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* ─── Scrollbars ───────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -56,42 +123,19 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.25);
+  background: rgba(148, 163, 184, 0.2);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.45);
+  background: rgba(148, 163, 184, 0.4);
 }
 
-/* Message Bubbles */
-.bubble-sent {
-  background-color: #0d52ce;
-  color: #ffffff;
-  border-radius: 16px 16px 2px 16px;
-  box-shadow: 0 2px 6px rgba(13, 82, 206, 0.2);
-}
-
-.bubble-received-dark {
-  background-color: #111827;
-  color: #f8fafc;
-  border: 1px solid #1e293b;
-  border-radius: 16px 16px 16px 2px;
-}
-
-.bubble-received-light {
-  background-color: #ffffff;
-  color: #0f172a;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px 16px 16px 2px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-/* Modal Pop Animation */
-@keyframes modalFadeIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
+/* ─── Animations ───────────────────────────────────────────── */
+@keyframes modalScale {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .modal-enter {
-  animation: modalFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalScale 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
