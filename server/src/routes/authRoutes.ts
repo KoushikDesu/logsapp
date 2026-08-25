@@ -91,18 +91,23 @@ router.post('/login', async (req: AuthRequest, res: Response): Promise<void> => 
       return;
     }
 
-    const cleanedIdentifier = identifier.trim();
+    const rawIdentifier = identifier.trim();
+    const cleanIdentifier = rawIdentifier.replace(/^[@#]+/, '').trim();
 
     const userRes = await query(
       `SELECT id, username, royal_id, display_name, email, password_hash, avatar_url, bio, 
               storage_limit_bytes, storage_used_bytes, is_online, last_seen, created_at 
        FROM users 
-       WHERE LOWER(username) = LOWER($1) OR UPPER(royal_id) = UPPER($1) OR LOWER(email) = LOWER($1)`,
-      [cleanedIdentifier]
+       WHERE LOWER(username) = LOWER($1) 
+          OR LOWER(username) = LOWER($2) 
+          OR royal_id = $1 
+          OR royal_id = $2 
+          OR (email IS NOT NULL AND LOWER(email) = LOWER($1))`,
+      [rawIdentifier, cleanIdentifier]
     );
 
     if (userRes.rows.length === 0) {
-      res.status(401).json({ error: 'Invalid username, RoyalID, or password' });
+      res.status(401).json({ error: 'Account not found. Please check your username / RoyalID or Sign Up first.' });
       return;
     }
 

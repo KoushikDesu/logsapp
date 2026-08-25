@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
 import { BrandLogo } from '../Common/BrandLogo.js';
-import { User, Lock, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Terminal, Sparkles } from 'lucide-react';
+import { getServerOrigin } from '../../services/api.js';
+import { User, Lock, ArrowRight, AlertCircle, RefreshCw, Terminal, Sparkles, Settings2, Globe, Check } from 'lucide-react';
 
 export const AuthModal: React.FC = () => {
   const { login, register } = useAuth();
@@ -11,14 +12,30 @@ export const AuthModal: React.FC = () => {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Register fields (Exact fields requested)
+  // Register fields (Exact 4 fields requested)
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Server settings toggle (for Vercel / custom backend connection)
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [customServerUrl, setCustomServerUrl] = useState(localStorage.getItem('logsapp_server_url') || '');
+  const [serverSaved, setServerSaved] = useState(false);
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleSaveServer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customServerUrl.trim()) {
+      localStorage.setItem('logsapp_server_url', customServerUrl.trim().replace(/\/+$/, ''));
+    } else {
+      localStorage.removeItem('logsapp_server_url');
+    }
+    setServerSaved(true);
+    setTimeout(() => setServerSaved(false), 2000);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,8 +70,7 @@ export const AuthModal: React.FC = () => {
           return;
         }
 
-        // Clean username: remove leading @ if typed
-        const cleanUsername = username.trim().toLowerCase().replace(/^@+/, '');
+        const cleanUsername = username.trim().toLowerCase().replace(/^[@#]+/, '');
 
         await register({
           display_name: displayName.trim(),
@@ -62,15 +78,23 @@ export const AuthModal: React.FC = () => {
           password: password,
         });
       } else {
-        if (!loginIdentifier || !loginPassword) {
-          setError('Please enter your username / Royal ID and password');
+        if (!loginIdentifier.trim() || !loginPassword) {
+          setError('Please enter your Username / Royal ID and password');
           setLoading(false);
           return;
         }
         await login(loginIdentifier.trim(), loginPassword);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Authentication failed. Please try again.');
+      console.error('Auth error:', err);
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else if (err.code === 'ERR_NETWORK' || !err.response) {
+        setError('Server is unreachable or waking up (Render free tier takes ~30s on first request). Please check your server connection or try again in a few moments.');
+        setShowServerConfig(true);
+      } else {
+        setError('Authentication failed. Please verify your credentials or Sign Up.');
+      }
     } finally {
       setLoading(false);
     }
@@ -78,9 +102,8 @@ export const AuthModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 overflow-y-auto">
-      {/* Background Ambient Glow (SmartPrep Style) */}
+      {/* Ambient Glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative w-full max-w-md bg-slateDark-surface dark:bg-slateDark-surface bg-white text-slateDark-text dark:text-slateDark-text text-slate-900 rounded-3xl shadow-2xl border border-slateDark-border dark:border-slateDark-border overflow-hidden">
         {/* Header Ribbon */}
@@ -125,9 +148,9 @@ export const AuthModal: React.FC = () => {
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{error}</span>
             </div>
           )}
 
@@ -196,7 +219,7 @@ export const AuthModal: React.FC = () => {
                   <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">@</span>
                   <input
                     type="text"
-                    value={username.replace(/^@+/, '')}
+                    value={username.replace(/^[@#]+/, '')}
                     onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                     placeholder="madarauchiha"
                     required
@@ -263,8 +286,47 @@ export const AuthModal: React.FC = () => {
           </button>
         </form>
 
+        {/* Backend Server Configuration Drawer (for Vercel / Remote Hosting) */}
+        <div className="px-6 py-2 bg-slateDark-bg/60 dark:bg-slateDark-bg/60 border-t border-slateDark-border/40 text-center">
+          <button
+            type="button"
+            onClick={() => setShowServerConfig(!showServerConfig)}
+            className="text-[11px] text-slate-400 hover:text-blue-400 flex items-center justify-center gap-1 mx-auto transition-colors"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            <span>{showServerConfig ? 'Hide Server URL' : 'Backend Server Settings'}</span>
+          </button>
+
+          {showServerConfig && (
+            <div className="mt-2 text-left p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2 animate-in fade-in">
+              <label className="block text-[11px] font-semibold text-slate-400">
+                Backend API URL (Render / VPS)
+              </label>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={customServerUrl}
+                  onChange={(e) => setCustomServerUrl(e.target.value)}
+                  placeholder="https://logsapp.onrender.com"
+                  className="flex-1 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-blue-300 placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveServer}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shrink-0 flex items-center gap-1"
+                >
+                  {serverSaved ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : 'Set'}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                Current: <code className="text-blue-400">{getServerOrigin()}</code>
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Footer CLI Info */}
-        <div className="p-3.5 bg-slateDark-bg/80 dark:bg-slateDark-bg/80 bg-slate-100 border-t border-slateDark-border/40 text-center">
+        <div className="p-3.5 bg-slateDark-bg/90 dark:bg-slateDark-bg/90 bg-slate-100 border-t border-slateDark-border/40 text-center">
           <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5 font-mono">
             <Terminal className="w-3.5 h-3.5 text-blue-400" />
             <span>Linux CLI: <code className="text-blue-400 font-bold">logsapp login</code></span>
