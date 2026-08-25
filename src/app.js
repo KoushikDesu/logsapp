@@ -77,9 +77,9 @@ const API = {
     const custom = localStorage.getItem('logsapp_server_url');
     if (custom) return custom.replace(/\/+$/, '') + '/api';
 
-    // When hosted on GitHub Pages, route API to live deployed backend server
-    if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
-      return 'https://logsapp.onrender.com/api';
+    // When hosted on GitHub Pages or Vercel static, route API to live deployed backend server
+    if (typeof window !== 'undefined' && (window.location.hostname.includes('github.io') || window.location.hostname.includes('vercel.app'))) {
+      return 'https://logsapp-2vqv.onrender.com/api';
     }
 
     // Local dev server
@@ -87,8 +87,8 @@ const API = {
       return 'http://localhost:5000/api';
     }
 
-    // Vercel / Render fullstack root
-    return '/api';
+    // Default: Render or same-origin
+    return 'https://logsapp-2vqv.onrender.com/api';
   },
   getServerHost() {
     const base = this.getBaseUrl();

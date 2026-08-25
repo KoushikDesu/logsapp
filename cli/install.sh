@@ -20,7 +20,7 @@ SOURCE_CLI="$SCRIPT_DIR/logsapp-cli.py"
 
 # If running via remote curl, download script to temporary file
 if [ ! -f "$SOURCE_CLI" ]; then
-    SERVER_URL="${LOGSAPP_SERVER:-http://localhost:5000}"
+    SERVER_URL="${LOGSAPP_SERVER:-https://logsapp-2vqv.onrender.com}"
     TMP_SRC=$(mktemp)
     curl -fsSL "$SERVER_URL/api/cli/logsapp-cli.py" -o "$TMP_SRC" || {
         echo "❌ Could not download CLI script from $SERVER_URL"

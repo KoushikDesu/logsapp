@@ -34,7 +34,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-DEFAULT_SERVER = os.environ.get("LOGSAPP_SERVER", "http://localhost:5000")
+DEFAULT_SERVER = os.environ.get("LOGSAPP_SERVER", "https://logsapp-2vqv.onrender.com")
 SESSION_FILE = Path.home() / ".logsapp_session.json"
 
 # ANSI Colors for Terminal Output
