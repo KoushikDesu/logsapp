@@ -186,6 +186,7 @@ router.get('/download/:messageId', async (req: AuthRequest, res: Response): Prom
     } else {
       res.setHeader('Content-Length', fileSize);
       res.setHeader('Content-Type', file_mime_type || 'application/octet-stream');
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file_name)}"`);
       const fileStream = fs.createReadStream(file_path);
       fileStream.pipe(res);

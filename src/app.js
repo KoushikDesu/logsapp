@@ -1,5 +1,5 @@
 // ============================================================
-// LogsApp — Ultra-Modern Glassmorphism UI (100% Silent & Flawless Light/Dark)
+// LogsApp — Ultra-Modern Glassmorphism UI (100% Silent & Persistent State)
 // ============================================================
 
 // Brand Logo SVG
@@ -107,7 +107,7 @@ const state = {
   token: localStorage.getItem('logsapp_token') || null,
   isDark: localStorage.getItem('logsapp_theme') !== 'light',
   chats: [],
-  activeChatId: null,
+  activeChatId: localStorage.getItem('logsapp_active_chat_id') || null,
   activeMessages: [],
   mobileView: 'sidebar',
   searchResults: [],
@@ -117,7 +117,8 @@ const state = {
   showStorageModal: false,
   showCLIModal: false,
   showServerConfig: false,
-  showAvatarGrid: false
+  showAvatarGrid: false,
+  lightboxMedia: null
 };
 
 // Toast Notifications
@@ -166,7 +167,7 @@ function render() {
         ${renderChatList()}
       </div>
 
-      <!-- Main Chat -->
+      <!-- Main Chat Area -->
       <div class="h-full flex-1 ${state.mobileView === 'chat' ? 'w-full flex flex-col' : 'hidden md:flex flex-col'}">
         ${renderChatArea()}
       </div>
@@ -177,6 +178,7 @@ function render() {
     ${state.showGroupModal ? renderGroupModal() : ''}
     ${state.showStorageModal ? renderStorageModal() : ''}
     ${state.showCLIModal ? renderCLIModal() : ''}
+    ${state.lightboxMedia ? renderLightbox() : ''}
   `;
 
   bindMainEvents();
@@ -544,7 +546,7 @@ function renderChatArea() {
   </div>`;
 }
 
-// Fixed Message Bubble Layout (No Text Collisions)
+// Fixed Message Bubble Layout (Images with fallback, Lightbox preview, and collision-free timestamps)
 function renderMessageBubble(msg, isMe) {
   const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const downloadUrl = `${API.getBaseUrl()}/files/download/${msg.id}`;
@@ -554,8 +556,11 @@ function renderMessageBubble(msg, isMe) {
     <div class="relative max-w-[85%] md:max-w-[70%]">
       <div class="rounded-2xl px-4 py-2.5 text-sm break-words ${isMe ? 'bubble-sent' : (state.isDark ? 'bubble-received-dark' : 'bubble-received-light')} flex flex-col">
         ${msg.message_type === 'image' ? `
-          <div class="mb-2 -mx-1.5 -mt-1 rounded-xl overflow-hidden cursor-pointer border border-white/10 shadow-sm">
-            <img src="${downloadUrl}" class="w-full max-h-72 object-cover" />
+          <div class="mb-2 -mx-1.5 -mt-1 rounded-xl overflow-hidden cursor-pointer border border-white/10 shadow-sm group relative" data-lightbox="${downloadUrl}">
+            <img src="${downloadUrl}" alt="Attached Image" loading="lazy" class="w-full max-h-72 object-cover transition-transform group-hover:scale-102" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'p-3 bg-black/40 text-xs text-amber-300 flex items-center gap-2\\'><span class=\\'mdi mdi-image-broken\\'></span> Photo attached (${msg.file_name || 'image'})</div>'" />
+            <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold gap-1">
+              <span class="mdi mdi-magnify-plus-outline text-lg"></span> View Full Size
+            </div>
             ${msg.quick_code ? `<div class="bg-black/75 px-2.5 py-1 flex justify-between text-[10px] text-amber-300 font-mono backdrop-blur-sm"><span>Code: ${msg.quick_code}</span></div>` : ''}
           </div>
         ` : ''}
@@ -579,6 +584,18 @@ function renderMessageBubble(msg, isMe) {
           ${isMe ? `<span class="mdi mdi-check-all text-cyan-300 ml-0.5"></span>` : ''}
         </div>
       </div>
+    </div>
+  </div>`;
+}
+
+// Lightbox Preview Modal
+function renderLightbox() {
+  return `
+  <div id="lightbox-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 cursor-pointer animate-in fade-in">
+    <div class="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
+      <button id="btn-close-lightbox" class="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"><span class="mdi mdi-close text-xl"></span></button>
+      <img src="${state.lightboxMedia}" class="max-w-full max-h-[80vh] rounded-2xl shadow-2xl object-contain border border-white/20" />
+      <a href="${state.lightboxMedia}" download="photo" class="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-lg"><span class="mdi mdi-download"></span> Download Full Resolution</a>
     </div>
   </div>`;
 }
@@ -761,7 +778,7 @@ function renderGroupModal() {
 }
 
 // ============================================================
-// EVENTS & SYNC (100% Silent)
+// EVENTS & SYNC
 // ============================================================
 async function loadChats() {
   if (!state.token) return;
@@ -787,7 +804,7 @@ async function loadMessages(chatId) {
 }
 
 function bindMainEvents() {
-  // Theme Toggle: Smoothly toggles Light / Dark and saves preference
+  // Theme Toggle
   document.getElementById('btn-toggle-theme')?.addEventListener('click', () => {
     state.isDark = !state.isDark;
     localStorage.setItem('logsapp_theme', state.isDark ? 'dark' : 'light');
@@ -812,6 +829,22 @@ function bindMainEvents() {
   document.getElementById('btn-toggle-avatar-grid')?.addEventListener('click', () => {
     state.showAvatarGrid = !state.showAvatarGrid;
     render();
+  });
+
+  // Lightbox close
+  document.getElementById('lightbox-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'lightbox-modal' || e.target.closest('#btn-close-lightbox')) {
+      state.lightboxMedia = null;
+      render();
+    }
+  });
+
+  // Lightbox click on image preview
+  document.querySelectorAll('[data-lightbox]').forEach(el => {
+    el.addEventListener('click', () => {
+      state.lightboxMedia = el.getAttribute('data-lightbox');
+      render();
+    });
   });
 
   document.querySelectorAll('.avatar-option-item').forEach(item => {
@@ -868,6 +901,7 @@ function bindMainEvents() {
     localStorage.clear();
     state.user = null;
     state.token = null;
+    state.activeChatId = null;
     state.showProfile = false;
     render();
   });
@@ -909,6 +943,7 @@ function bindMainEvents() {
         state.searchQuery = '';
         state.searchResults = [];
         state.activeChatId = data.chatId;
+        localStorage.setItem('logsapp_active_chat_id', data.chatId);
         state.mobileView = 'chat';
         await loadChats();
         await loadMessages(data.chatId);
@@ -923,6 +958,7 @@ function bindMainEvents() {
     item.addEventListener('click', async () => {
       const chatId = item.getAttribute('data-chat-id');
       state.activeChatId = chatId;
+      localStorage.setItem('logsapp_active_chat_id', chatId);
       state.mobileView = 'chat';
       await loadMessages(chatId);
       render();
@@ -1002,6 +1038,7 @@ function bindMainEvents() {
       });
       state.showGroupModal = false;
       state.activeChatId = res.chat.id;
+      localStorage.setItem('logsapp_active_chat_id', res.chat.id);
       state.mobileView = 'chat';
       await loadChats();
       await loadMessages(res.chat.id);
@@ -1030,9 +1067,25 @@ setInterval(async () => {
   }
 }, 3000);
 
+// App Initialization with Hard Reload State Preservation
 (async function init() {
   if (state.token) {
+    // 1. Sync User Profile from Database
+    try {
+      const meData = await API.request('/auth/me');
+      if (meData.user) {
+        state.user = meData.user;
+        localStorage.setItem('logsapp_user', JSON.stringify(meData.user));
+      }
+    } catch (e) {}
+
+    // 2. Load all chats
     await loadChats();
+
+    // 3. Restore active chat and its messages / images immediately on reload
+    if (state.activeChatId) {
+      await loadMessages(state.activeChatId);
+    }
   }
   render();
 })();
