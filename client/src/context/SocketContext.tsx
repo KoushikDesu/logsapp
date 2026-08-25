@@ -94,16 +94,19 @@ export const SocketProvider: React.FC<{
       }
     });
 
-    newSocket.on('reaction_updated', (data: any) => {
-      if (onReactionUpdate) {
-        onReactionUpdate(data);
-      }
-    });
+      newSocket.on('reaction_updated', (data: any) => {
+        if (onReactionUpdate) {
+          onReactionUpdate(data);
+        }
+      });
 
-    setSocket(newSocket);
+      setSocket(newSocket);
+    } catch (err) {
+      console.warn('Socket initialization error:', err);
+    }
 
     return () => {
-      newSocket.disconnect();
+      if (newSocket) newSocket.disconnect();
     };
   }, [token, user?.id]);
 
