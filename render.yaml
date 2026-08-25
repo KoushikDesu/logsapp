@@ -13,7 +13,7 @@ services:
       - key: DIRECT_URL
         value: postgresql://postgres.oqtexpxdxueitsghwloj:Kingofstates1119@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
       - key: JWT_SECRET
-        generateValue: true
+        value: logsapp_royal_secret_jwt_key_2026_super_secure_token
       - key: UPLOAD_DIR
         value: ./uploads
       - key: MAX_FILE_SIZE

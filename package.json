@@ -3,9 +3,13 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm install --prefix server && npm run build --prefix server",
     "vercel-build": "vite build",
     "preview": "vite preview",
     "start": "node server/dist/index.js"
@@ -24,6 +28,7 @@
     "uuid": "^11.0.3"
   },
   "devDependencies": {
+    "typescript": "^5.7.2",
     "vite": "^6.0.1"
   }
 }
