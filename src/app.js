@@ -390,6 +390,9 @@ function renderSidebarHeader() {
 
     <!-- Header Actions -->
     <div class="flex items-center gap-1 ${state.isDark ? 'text-slate-400' : 'text-slate-500'}">
+      <button id="btn-toggle-notif" class="p-2 hover:bg-white/10 rounded-xl ${typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' ? 'text-emerald-400' : 'text-slate-400 hover:text-blue-500'} transition-all" title="${typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' ? 'Notifications Active' : 'Enable Web Notifications'}">
+        <span class="mdi ${typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' ? 'mdi-bell-ring' : 'mdi-bell-outline'} text-lg"></span>
+      </button>
       <button id="btn-open-cli" class="p-2 hover:bg-white/10 rounded-xl text-blue-500 hover:text-blue-400 transition-all" title="Linux CLI Companion"><span class="mdi mdi-console text-lg"></span></button>
       <button id="btn-open-storage" class="p-2 hover:bg-white/10 rounded-xl text-amber-500 hover:text-amber-400 transition-all" title="Storage Quota"><span class="mdi mdi-harddisk text-lg"></span></button>
       <button id="btn-open-group" class="p-2 hover:bg-white/10 rounded-xl hover:text-blue-500 transition-all" title="New Group"><span class="mdi mdi-account-multiple-plus text-lg"></span></button>
@@ -1048,19 +1051,68 @@ function bindMainEvents() {
       showToast('Failed to create group', 'error');
     }
   });
+
+  // Notification Permission Toggle
+  document.getElementById('btn-toggle-notif')?.addEventListener('click', async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      showToast('Notifications not supported by this browser', 'info');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      showToast('Desktop Notifications are already active! 🔔', 'info');
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        showToast('Desktop Notifications enabled! 🎉', 'success');
+        try {
+          new Notification('LogsApp Notifications Enabled', {
+            body: 'You will receive new message and 1GB file notifications.',
+            icon: state.user?.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=LogsApp'
+          });
+        } catch (e) {}
+        render();
+      } else {
+        showToast('Notification permission was not granted', 'info');
+      }
+    } catch (e) {
+      showToast('Notification request failed', 'error');
+    }
+  });
 }
 
-// 3s Smart Polling (100% Silent)
+// 3s Smart Polling with Desktop Push Notifications (100% Silent)
 setInterval(async () => {
   if (state.token && state.activeChatId) {
     try {
       const data = await API.request(`/messages/${state.activeChatId}`);
       const incoming = data.messages || [];
       if (incoming.length !== state.activeMessages.length) {
+        const newMsgs = incoming.slice(state.activeMessages.length);
         state.activeMessages = incoming;
         render();
         const container = document.getElementById('messages-container');
         if (container) container.scrollTop = container.scrollHeight;
+
+        // Desktop Notification for incoming messages when tab is in background
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          newMsgs.forEach(msg => {
+            if (msg.sender_id !== state.user?.id) {
+              try {
+                const notif = new Notification(`${msg.sender_display_name || 'LogsApp Contact'}`, {
+                  body: msg.message_type !== 'text' ? `📎 Sent a ${msg.message_type}: ${msg.file_name || ''}` : msg.content,
+                  icon: msg.sender_avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=LogsApp'
+                });
+                notif.onclick = () => {
+                  window.focus();
+                  notif.close();
+                };
+              } catch (e) {}
+            }
+          });
+        }
+
         await loadChats();
       }
     } catch (e) {}
