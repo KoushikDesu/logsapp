@@ -1,5 +1,5 @@
 // ============================================================
-// LogsApp — Ultra-Modern Glassmorphism UI (100% Silent & Persistent State)
+// LogsApp — Ultra-Modern Glassmorphism UI (Persistent State & Mobile-Optimized)
 // ============================================================
 
 // Brand Logo SVG
@@ -49,9 +49,24 @@ export const ANIME_AVATARS = [
   { name: 'Giyu Tomioka (Water Hashira)', anime: 'Demon Slayer', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=GiyuTomioka&hair=long02&hairColor=000033&eyes=variant02' }
 ];
 
-export function getRandomAnimeAvatar() {
-  const index = Math.floor(Math.random() * ANIME_AVATARS.length);
+// Deterministic Anime Avatar Generator (Consistent across all devices and logins)
+export function getDeterministicAnimeAvatar(seed = '') {
+  if (!seed) return ANIME_AVATARS[0];
+  let hash = 0;
+  const str = String(seed);
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % ANIME_AVATARS.length;
   return ANIME_AVATARS[index];
+}
+
+export function getUserAvatar(user) {
+  if (!user) return ANIME_AVATARS[0].url;
+  if (user.avatar_url && user.avatar_url.startsWith('http')) {
+    return user.avatar_url;
+  }
+  return getDeterministicAnimeAvatar(user.royal_id || user.username || 'user').url;
 }
 
 // API Helper
@@ -141,7 +156,7 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
-// Master Render
+// Master Render with 100dvh Mobile Support
 function render() {
   const root = document.getElementById('app');
   if (!root) return;
@@ -159,16 +174,16 @@ function render() {
   }
 
   root.innerHTML = `
-    <div class="h-screen w-screen flex overflow-hidden ${state.isDark ? 'bg-ambient-dark text-slate-100' : 'bg-ambient-light text-slate-900'}">
+    <div class="h-[100dvh] w-screen flex overflow-hidden ${state.isDark ? 'bg-ambient-dark text-slate-100' : 'bg-ambient-light text-slate-900'}">
       <!-- Sidebar -->
-      <div class="h-full ${state.mobileView === 'sidebar' ? 'w-full md:w-[380px] lg:w-[410px] block' : 'hidden md:block'} border-r ${state.isDark ? 'border-white/10 bg-slate-950/40 backdrop-blur-xl' : 'border-slate-200/90 bg-white/80 backdrop-blur-xl'} shrink-0 flex flex-col z-20">
+      <div class="h-[100dvh] ${state.mobileView === 'sidebar' ? 'w-full md:w-[380px] lg:w-[410px] flex' : 'hidden md:flex'} border-r ${state.isDark ? 'border-white/10 bg-slate-950/40 backdrop-blur-xl' : 'border-slate-200/90 bg-white/80 backdrop-blur-xl'} shrink-0 flex-col z-20">
         ${renderSidebarHeader()}
         ${renderSearchBar()}
         ${renderChatList()}
       </div>
 
       <!-- Main Chat Area -->
-      <div class="h-full flex-1 ${state.mobileView === 'chat' ? 'w-full flex flex-col' : 'hidden md:flex flex-col'}">
+      <div class="h-[100dvh] flex-1 ${state.mobileView === 'chat' ? 'w-full flex flex-col' : 'hidden md:flex flex-col'}">
         ${renderChatArea()}
       </div>
     </div>
@@ -192,10 +207,10 @@ let isSignUpTab = false;
 function renderAuthScreen() {
   const currentServer = API.getBaseUrl().replace(/\/api$/, '');
   return `
-  <div class="h-screen w-screen flex items-center justify-center ${state.isDark ? 'bg-ambient-dark text-slate-100' : 'bg-ambient-light text-slate-900'} p-4 relative overflow-hidden">
+  <div class="h-[100dvh] w-screen flex items-center justify-center ${state.isDark ? 'bg-ambient-dark text-slate-100' : 'bg-ambient-light text-slate-900'} p-4 relative overflow-hidden">
     <div class="absolute top-1/4 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-blue-600/15 rounded-full blur-3xl pointer-events-none"></div>
 
-    <div class="relative w-full max-w-md ${state.isDark ? 'glass-card-dark' : 'glass-card-light'} rounded-3xl overflow-hidden modal-enter">
+    <div class="relative w-full max-w-md ${state.isDark ? 'glass-card-dark' : 'glass-card-light'} rounded-3xl overflow-hidden modal-enter max-h-[95dvh] overflow-y-auto">
       <!-- Header Banner -->
       <div class="bg-gradient-to-r from-blue-700/90 via-blue-600/90 to-indigo-700/90 p-6 text-white text-center border-b border-white/10 backdrop-blur-md">
         <div class="flex justify-center mb-3">
@@ -327,7 +342,7 @@ function bindAuthEvents() {
         if (password !== confirm) throw new Error('Passwords do not match.');
         if (password.length < 6) throw new Error('Password must be at least 6 characters.');
 
-        const initialAvatar = getRandomAnimeAvatar().url;
+        const initialAvatar = getDeterministicAnimeAvatar(username).url;
 
         const data = await API.request('/auth/register', {
           method: 'POST',
@@ -371,9 +386,9 @@ function bindAuthEvents() {
 // SIDEBAR
 // ============================================================
 function renderSidebarHeader() {
-  const avatar = state.user?.avatar_url || getRandomAnimeAvatar().url;
+  const avatar = getUserAvatar(state.user);
   return `
-  <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'glass-nav-dark' : 'glass-nav-light'}">
+  <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'glass-nav-dark' : 'glass-nav-light'} shrink-0">
     <!-- Clickable User Profile -->
     <button id="btn-open-profile" class="flex items-center gap-3 p-1.5 rounded-2xl hover:bg-white/10 text-left transition-all group">
       <div class="relative shrink-0">
@@ -403,7 +418,7 @@ function renderSidebarHeader() {
 
 function renderSearchBar() {
   return `
-  <div class="p-3 relative bg-transparent">
+  <div class="p-3 relative bg-transparent shrink-0">
     <div class="relative flex items-center ${state.isDark ? 'bg-slate-900/60 border-white/10 text-slate-100' : 'bg-slate-100/90 border-slate-200 text-slate-900'} border rounded-2xl px-3.5 py-2.5 backdrop-blur-md transition-all shadow-inner focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
       <span class="mdi mdi-magnify ${state.isDark ? 'text-slate-400' : 'text-slate-500'} mr-2 text-base"></span>
       <input type="text" id="search-input" value="${state.searchQuery}" placeholder="Search username or 7-digit Royal ID..." class="w-full bg-transparent text-sm focus:outline-none placeholder:text-slate-400" />
@@ -414,7 +429,7 @@ function renderSearchBar() {
       <div class="absolute top-full left-3 right-3 z-30 mt-1 max-h-72 overflow-y-auto ${state.isDark ? 'glass-card-dark border-white/10 divide-white/5' : 'glass-card-light border-slate-200 divide-slate-100'} rounded-2xl shadow-2xl divide-y border">
         ${state.searchResults.map(u => `
           <div class="search-user-item flex items-center gap-3 p-3 hover:bg-blue-500/10 cursor-pointer transition-colors" data-user-id="${u.id}">
-            <img src="${u.avatar_url || getRandomAnimeAvatar().url}" class="w-10 h-10 rounded-xl bg-slate-900 ring-1 ring-blue-500/30 object-cover" />
+            <img src="${getUserAvatar(u)}" class="w-10 h-10 rounded-xl bg-slate-900 ring-1 ring-blue-500/30 object-cover" />
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between">
                 <h5 class="text-sm font-semibold truncate ${state.isDark ? 'text-slate-100' : 'text-slate-900'}">${u.display_name}</h5>
@@ -446,7 +461,7 @@ function renderChatList() {
       const isActive = chat.id === state.activeChatId;
       const other = !chat.is_group && chat.other_participants ? chat.other_participants[0] : null;
       const title = chat.is_group ? chat.name : (other?.display_name || 'Direct Chat');
-      const avatar = chat.is_group ? (chat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${chat.name}`) : (other?.avatar_url || getRandomAnimeAvatar().url);
+      const avatar = chat.is_group ? (chat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${chat.name}`) : getUserAvatar(other);
       const lastMsg = chat.last_message ? (chat.last_message.message_type !== 'text' ? `📎 [${chat.last_message.message_type.toUpperCase()}] ${chat.last_message.file_name || ''}` : chat.last_message.content) : 'No messages yet';
       const time = chat.last_message?.created_at ? new Date(chat.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const unreadCount = Number(chat.unread_count || 0);
@@ -503,12 +518,12 @@ function renderChatArea() {
 
   const other = !activeChat.is_group && activeChat.other_participants ? activeChat.other_participants[0] : null;
   const title = activeChat.is_group ? activeChat.name : (other?.display_name || 'Direct Chat');
-  const avatar = activeChat.is_group ? (activeChat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${activeChat.name}`) : (other?.avatar_url || getRandomAnimeAvatar().url);
+  const avatar = activeChat.is_group ? (activeChat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${activeChat.name}`) : getUserAvatar(other);
 
   return `
-  <div class="flex-1 h-full flex flex-col bg-transparent relative">
+  <div class="flex-1 h-full flex flex-col bg-transparent relative overflow-hidden">
     <!-- Chat Header -->
-    <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'glass-nav-dark' : 'glass-nav-light'} z-10">
+    <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'glass-nav-dark' : 'glass-nav-light'} shrink-0 z-10">
       <div class="flex items-center gap-3 min-w-0">
         <button id="btn-chat-back" class="md:hidden p-1 ${state.isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'}"><span class="mdi mdi-arrow-left text-xl"></span></button>
         <img src="${avatar}" class="w-10 h-10 rounded-xl object-cover bg-slate-900 border ${state.isDark ? 'border-white/10' : 'border-slate-200'} shrink-0 ring-1 ring-blue-500/30 shadow" />
@@ -537,8 +552,8 @@ function renderChatArea() {
       ` : state.activeMessages.map(msg => renderMessageBubble(msg, msg.sender_id === state.user.id)).join('')}
     </div>
 
-    <!-- Input Bar -->
-    <div class="p-3 border-t ${state.isDark ? 'glass-nav-dark' : 'glass-nav-light'}">
+    <!-- Mobile-Optimized Input Bar (Never hidden behind mobile taskbar) -->
+    <div class="p-3 border-t ${state.isDark ? 'glass-nav-dark' : 'glass-nav-light'} shrink-0" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));">
       <form id="chat-input-form" class="flex items-center gap-2 max-w-5xl mx-auto">
         <input type="file" id="file-upload-input" class="hidden" />
         <button type="button" id="btn-attach-file" class="p-2.5 ${state.isDark ? 'text-slate-400 hover:text-blue-400' : 'text-slate-500 hover:text-blue-600'} rounded-2xl hover:bg-white/10 transition-all" title="Attach file (up to 1GB)"><span class="mdi mdi-paperclip text-xl"></span></button>
@@ -549,7 +564,7 @@ function renderChatArea() {
   </div>`;
 }
 
-// Fixed Message Bubble Layout (Images with fallback, Lightbox preview, and collision-free timestamps)
+// Fixed Message Bubble Layout
 function renderMessageBubble(msg, isMe) {
   const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const downloadUrl = `${API.getBaseUrl()}/files/download/${msg.id}`;
@@ -581,7 +596,7 @@ function renderMessageBubble(msg, isMe) {
 
         ${msg.content && msg.content !== msg.file_name ? `<p class="whitespace-pre-wrap leading-relaxed">${msg.content}</p>` : ''}
 
-        <!-- Clean Timestamp Flow (Never collides with message text) -->
+        <!-- Clean Timestamp Flow -->
         <div class="flex items-center justify-end gap-1 mt-1.5 pt-0.5 text-[10px] opacity-75 font-mono select-none">
           <span>${time}</span>
           ${isMe ? `<span class="mdi mdi-check-all text-cyan-300 ml-0.5"></span>` : ''}
@@ -607,14 +622,14 @@ function renderLightbox() {
 // PROFILE MODAL (Glassmorphism + Anime Character Grid)
 // ============================================================
 function renderProfileModal() {
-  const avatar = state.user?.avatar_url || getRandomAnimeAvatar().url;
+  const avatar = getUserAvatar(state.user);
   const currentAnime = ANIME_AVATARS.find(a => a.url === avatar);
   const usedMb = ((Number(state.user?.storage_used_bytes || 0)) / (1024 * 1024)).toFixed(2);
   const limitMb = ((Number(state.user?.storage_limit_bytes || 1073741824)) / (1024 * 1024)).toFixed(0);
 
   return `
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-lg p-4 animate-in fade-in">
-    <div class="w-full max-w-lg ${state.isDark ? 'glass-card-dark' : 'glass-card-light'} rounded-3xl overflow-hidden modal-enter max-h-[90vh] flex flex-col border">
+    <div class="w-full max-w-lg ${state.isDark ? 'glass-card-dark' : 'glass-card-light'} rounded-3xl overflow-hidden modal-enter max-h-[90dvh] flex flex-col border">
       <!-- Top Banner -->
       <div class="relative bg-gradient-to-r from-blue-700/85 via-indigo-700/85 to-purple-800/85 p-6 text-white text-center shrink-0 border-b border-white/10">
         <button id="btn-close-profile" class="absolute top-4 right-4 p-1.5 bg-black/30 hover:bg-black/50 rounded-full transition-all text-white"><span class="mdi mdi-close text-base"></span></button>
@@ -862,7 +877,7 @@ function bindMainEvents() {
         state.user.avatar_url = selectedUrl;
         localStorage.setItem('logsapp_user', JSON.stringify(state.user));
         render();
-        showToast('Anime Avatar selected!', 'success');
+        showToast('Anime Avatar saved to account!', 'success');
       } catch (e) {
         showToast('Failed to update avatar', 'error');
       }
@@ -883,9 +898,9 @@ function bindMainEvents() {
     }
   });
 
-  // Shuffle Anime Avatar (Silent)
+  // Shuffle Anime Avatar (Saves to DB)
   document.getElementById('btn-shuffle-avatar')?.addEventListener('click', async () => {
-    const randomAnime = getRandomAnimeAvatar();
+    const randomAnime = ANIME_AVATARS[Math.floor(Math.random() * ANIME_AVATARS.length)];
     try {
       await API.request('/auth/me', {
         method: 'PUT',
@@ -894,7 +909,7 @@ function bindMainEvents() {
       state.user.avatar_url = randomAnime.url;
       localStorage.setItem('logsapp_user', JSON.stringify(state.user));
       render();
-      showToast(`Shuffled to ${randomAnime.name}!`, 'success');
+      showToast(`Avatar updated to ${randomAnime.name}!`, 'success');
     } catch (e) {
       showToast('Failed to update avatar', 'error');
     }
@@ -1069,7 +1084,7 @@ function bindMainEvents() {
         try {
           new Notification('LogsApp Notifications Enabled', {
             body: 'You will receive new message and 1GB file notifications.',
-            icon: state.user?.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=LogsApp'
+            icon: getUserAvatar(state.user)
           });
         } catch (e) {}
         render();
@@ -1119,10 +1134,10 @@ setInterval(async () => {
   }
 }, 3000);
 
-// App Initialization with Hard Reload State Preservation
+// App Initialization with Hard Reload & Multi-Device State Preservation
 (async function init() {
   if (state.token) {
-    // 1. Sync User Profile from Database
+    // 1. Sync User Profile directly from Database
     try {
       const meData = await API.request('/auth/me');
       if (meData.user) {

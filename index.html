@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>LogsApp — Web Chat</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><rect width='32' height='32' rx='8' fill='%230d52ce'/><circle cx='11' cy='11' r='4' fill='white'/><path d='M4 23C4 19.6863 7.13401 17 11 17C14.866 17 18 19.6863 18 23' fill='white' fill-opacity='0.95'/><circle cx='21' cy='13' r='3.5' fill='%23f59e0b'/><path d='M15 25C15 22.2386 17.6863 20 21 20C24.3137 20 27 22.2386 27 25' fill='%23f59e0b' fill-opacity='0.95'/></svg>" />
   
@@ -18,11 +18,11 @@
   <!-- Clean SmartPrep CSS -->
   <link rel="stylesheet" href="./src/styles/app.css" />
 </head>
-<body class="bg-[#0b0f19] text-[#f8fafc] font-sans antialiased overflow-hidden select-none m-0 p-0">
-  <div id="app" class="h-screen w-screen flex flex-col"></div>
+<body class="bg-[#0b0f19] text-[#f8fafc] font-sans antialiased overflow-hidden select-none m-0 p-0" style="height: 100dvh; min-height: 100dvh;">
+  <div id="app" class="h-[100dvh] w-screen flex flex-col overflow-hidden"></div>
 
   <!-- Toast Notification Container -->
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" style="bottom: max(1.25rem, env(safe-area-inset-bottom));"></div>
 
   <!-- App Script (Pure JavaScript, Zero-Build) -->
   <script type="module" src="./src/app.js"></script>
