@@ -1,20 +1,19 @@
 // ============================================================
-// RoyalChat / LogsApp — Pure JavaScript Frontend (Zero Build)
+// LogsApp — Web Chat (Clean SmartPrep UI & Multi-Host API)
 // ============================================================
 
-// Brand Logo SVG (2 People Chatting / Connecting)
-export const BRAND_LOGO_SVG = `
-<div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 shadow-lg shadow-blue-500/25 p-1 shrink-0">
+// 2-People Connecting / Chatting Vector Logo
+export const LOGO_SVG = `
+<div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-blue-600 shadow-md p-1.5 shrink-0">
   <svg viewBox="0 0 32 32" fill="none" class="w-full h-full">
     <circle cx="11" cy="11" r="4" fill="white" />
     <path d="M4 23C4 19.6863 7.13401 17 11 17C14.866 17 18 19.6863 18 23" fill="white" fill-opacity="0.95" />
     <circle cx="21" cy="13" r="3.5" fill="#f59e0b" />
     <path d="M15 25C15 22.2386 17.6863 20 21 20C24.3137 20 27 22.2386 27 25" fill="#f59e0b" fill-opacity="0.95" />
-    <circle cx="16" cy="7" r="1.5" fill="#60a5fa" />
   </svg>
 </div>`;
 
-// Sound Engine using Web Audio API
+// Sound Engine
 class SoundEngine {
   constructor() {
     this.enabled = localStorage.getItem('logsapp_sound') !== 'false';
@@ -37,7 +36,7 @@ class SoundEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(587.33, this.ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -55,13 +54,13 @@ class SoundEngine {
       const gain = this.ctx.createGain();
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(880, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1174.66, this.ctx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+      osc.frequency.exponentialRampToValueAtTime(1174.66, this.ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start();
-      osc.stop(this.ctx.currentTime + 0.12);
+      osc.stop(this.ctx.currentTime + 0.1);
     } catch (e) {}
   }
   toggle() {
@@ -72,13 +71,28 @@ class SoundEngine {
 }
 const sounds = new SoundEngine();
 
-// API Helper
+// API Helper with GitHub Pages / Vercel / Render detection
 const API = {
   getBaseUrl() {
     const custom = localStorage.getItem('logsapp_server_url');
     if (custom) return custom.replace(/\/+$/, '') + '/api';
-    if (window.location.port === '3000') return 'http://localhost:5000/api';
+
+    // When hosted on GitHub Pages, route API to live deployed backend server
+    if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
+      return 'https://logsapp.onrender.com/api';
+    }
+
+    // Local dev server
+    if (typeof window !== 'undefined' && (window.location.port === '3000' || window.location.port === '5173')) {
+      return 'http://localhost:5000/api';
+    }
+
+    // Vercel / Render fullstack root
     return '/api';
+  },
+  getServerHost() {
+    const base = this.getBaseUrl();
+    return base.replace(/\/api$/, '');
   },
   async request(endpoint, options = {}) {
     const token = localStorage.getItem('logsapp_token');
@@ -91,12 +105,19 @@ const API = {
       delete headers['Content-Type'];
     }
     const url = `${this.getBaseUrl()}${endpoint}`;
-    const res = await fetch(url, { ...options, headers });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || `HTTP error ${res.status}`);
+    try {
+      const res = await fetch(url, { ...options, headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Server returned error (${res.status})`);
+      }
+      return data;
+    } catch (err) {
+      if (err.name === 'TypeError' || err.message.includes('Failed to fetch')) {
+        throw new Error('Could not connect to backend server. If you are on GitHub Pages or Render, please check your server connection.');
+      }
+      throw err;
     }
-    return data;
   }
 };
 
@@ -108,14 +129,14 @@ const state = {
   chats: [],
   activeChatId: null,
   activeMessages: [],
-  mobileView: 'sidebar', // 'sidebar' | 'chat'
+  mobileView: 'sidebar',
   searchResults: [],
   searchQuery: '',
   showProfile: false,
   showGroupModal: false,
   showStorageModal: false,
   showCLIModal: false,
-  lightboxMedia: null
+  showServerConfig: false
 };
 
 // Toast Notifications
@@ -131,50 +152,40 @@ function showToast(msg, type = 'info') {
   toast.className = `p-3 px-4 rounded-xl border text-xs font-semibold shadow-xl flex items-center gap-2 pointer-events-auto transition-all transform translate-y-2 opacity-0 ${colors[type] || colors.info}`;
   toast.innerHTML = `<span>${msg}</span>`;
   container.appendChild(toast);
-  setTimeout(() => {
-    toast.classList.remove('translate-y-2', 'opacity-0');
-  }, 10);
+  setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
   setTimeout(() => {
     toast.classList.add('opacity-0', 'translate-y-2');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 }
 
-// 7-Digit Royal ID Generator (pure numbers)
-function generateRandom7Digit() {
-  return String(Math.floor(1000000 + Math.random() * 9000000));
-}
-
-// Main Render Function
+// Render Master
 function render() {
   const root = document.getElementById('app');
   if (!root) return;
 
-  // Sync Dark/Light theme class on <html>
   if (state.isDark) {
     document.documentElement.classList.add('dark');
   } else {
     document.documentElement.classList.remove('dark');
   }
 
-  // Not Logged In -> Show Auth Screen
   if (!state.user || !state.token) {
     root.innerHTML = renderAuthScreen();
     bindAuthEvents();
     return;
   }
 
-  // Logged In -> Show Main Messenger Layout
   root.innerHTML = `
-    <div class="h-screen w-screen flex overflow-hidden ${state.isDark ? 'bg-slateDark-bg text-slateDark-text' : 'bg-slateLight-bg text-slateLight-text'}">
-      <!-- Sidebar Panel -->
-      <div class="h-full ${state.mobileView === 'sidebar' ? 'w-full md:w-[380px] lg:w-[420px] block' : 'hidden md:block'} border-r ${state.isDark ? 'border-slateDark-border bg-slateDark-bg' : 'border-slateLight-border bg-white'} shrink-0 flex flex-col">
+    <div class="h-screen w-screen flex overflow-hidden ${state.isDark ? 'bg-[#0b0f19] text-[#f8fafc]' : 'bg-[#f8fafc] text-[#0f172a]'}">
+      <!-- Sidebar -->
+      <div class="h-full ${state.mobileView === 'sidebar' ? 'w-full md:w-[380px] lg:w-[420px] block' : 'hidden md:block'} border-r ${state.isDark ? 'border-[#1e293b] bg-[#0b0f19]' : 'border-[#e2e8f0] bg-white'} shrink-0 flex flex-col">
         ${renderSidebarHeader()}
         ${renderSearchBar()}
         ${renderChatList()}
       </div>
 
-      <!-- Main Chat Panel -->
+      <!-- Main Chat Area -->
       <div class="h-full flex-1 ${state.mobileView === 'chat' ? 'w-full flex flex-col' : 'hidden md:flex flex-col'}">
         ${renderChatArea()}
       </div>
@@ -185,38 +196,35 @@ function render() {
     ${state.showGroupModal ? renderGroupModal() : ''}
     ${state.showStorageModal ? renderStorageModal() : ''}
     ${state.showCLIModal ? renderCLIModal() : ''}
-    ${state.lightboxMedia ? renderLightbox() : ''}
   `;
 
   bindMainEvents();
 }
 
 // ============================================================
-// AUTH VIEW (Sign In & Sign Up with exact 4 fields)
+// AUTH SCREEN
 // ============================================================
 let isSignUpTab = false;
 
 function renderAuthScreen() {
+  const currentServer = API.getBaseUrl().replace(/\/api$/, '');
   return `
-  <div class="h-screen w-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-    <!-- Ambient Glows -->
-    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/15 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute bottom-1/4 right-1/3 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+  <div class="h-screen w-screen flex items-center justify-center bg-[#0b0f19] p-4 relative overflow-hidden">
+    <!-- Clean Ambient Background -->
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
-    <div class="relative w-full max-w-md bg-slateDark-surface text-slate-100 rounded-3xl shadow-2xl border border-slateDark-border overflow-hidden modal-animate">
-      <!-- Header Ribbon -->
-      <div class="bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 p-6 text-white text-center relative">
+    <div class="relative w-full max-w-md bg-[#111827] text-slate-100 rounded-2xl shadow-2xl border border-[#1e293b] overflow-hidden modal-enter">
+      <!-- Brand Header -->
+      <div class="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 p-6 text-white text-center">
         <div class="flex justify-center mb-3">
-          ${BRAND_LOGO_SVG}
+          ${LOGO_SVG}
         </div>
-        <h1 class="text-2xl font-bold tracking-tight font-heading">
-          RoyalChat <span class="text-amber-400 text-xs font-mono font-normal ml-1">v2.0</span>
-        </h1>
-        <p class="text-blue-100 text-xs mt-1">Real-Time Messenger • 1GB File Bridge • Linux CLI Ready</p>
+        <h1 class="text-2xl font-bold font-heading tracking-tight">LogsApp</h1>
+        <p class="text-blue-100 text-xs mt-0.5">Web Chat • 1GB File Bridge • Linux Terminal Ready</p>
       </div>
 
       <!-- Tab Switcher -->
-      <div class="flex border-b border-slateDark-border/60 text-sm font-semibold">
+      <div class="flex border-b border-[#1e293b] text-sm font-semibold">
         <button id="tab-signin" class="flex-1 py-3 text-center transition-all ${!isSignUpTab ? 'text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 font-bold' : 'text-slate-400 hover:text-slate-200'}">
           Sign In
         </button>
@@ -230,48 +238,66 @@ function renderAuthScreen() {
         <div id="auth-error" class="hidden p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2"></div>
 
         ${!isSignUpTab ? `
-          <!-- Sign In Form -->
+          <!-- Sign In -->
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">Username or 7-Digit Royal ID</label>
-            <input type="text" id="login-identifier" placeholder="e.g. @madarauchiha or 7482910" required class="w-full px-3.5 py-2.5 bg-slateDark-bg border border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500 font-mono" />
+            <input type="text" id="login-identifier" placeholder="e.g. @madarauchiha or 8471027" required class="w-full px-3.5 py-2.5 bg-[#0b0f19] border border-[#1e293b] rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500 font-mono" />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">Password</label>
-            <input type="password" id="login-password" placeholder="••••••••" required class="w-full px-3.5 py-2.5 bg-slateDark-bg border border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
+            <input type="password" id="login-password" placeholder="••••••••" required class="w-full px-3.5 py-2.5 bg-[#0b0f19] border border-[#1e293b] rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
           </div>
         ` : `
-          <!-- Sign Up Form (Only the exact 4 requested fields) -->
+          <!-- Sign Up (Exact 4 fields) -->
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">Display Name</label>
-            <input type="text" id="reg-name" placeholder="Madara Uchiha" required class="w-full px-3.5 py-2.5 bg-slateDark-bg border border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
+            <input type="text" id="reg-name" placeholder="Madara Uchiha" required class="w-full px-3.5 py-2.5 bg-[#0b0f19] border border-[#1e293b] rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">Username</label>
             <div class="relative flex items-center">
               <span class="absolute left-3 text-slate-400 font-bold text-sm">@</span>
-              <input type="text" id="reg-username" placeholder="madarauchiha" required class="w-full pl-8 pr-3.5 py-2.5 bg-slateDark-bg border border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500 font-mono" />
+              <input type="text" id="reg-username" placeholder="madarauchiha" required class="w-full pl-8 pr-3.5 py-2.5 bg-[#0b0f19] border border-[#1e293b] rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500 font-mono" />
             </div>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">Password</label>
-            <input type="password" id="reg-password" placeholder="••••••••" required class="w-full px-3.5 py-2.5 bg-slateDark-bg border border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
+            <input type="password" id="reg-password" placeholder="••••••••" required class="w-full px-3.5 py-2.5 bg-[#0b0f19] border border-[#1e293b] rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">Re-enter Password</label>
-            <input type="password" id="reg-confirm" placeholder="••••••••" required class="w-full px-3.5 py-2.5 bg-slateDark-bg border border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
+            <input type="password" id="reg-confirm" placeholder="••••••••" required class="w-full px-3.5 py-2.5 bg-[#0b0f19] border border-[#1e293b] rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
           </div>
-          <div class="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300 flex items-center gap-2">
-            <span>✨ A unique <b>7-digit Royal ID</b> (e.g. <code>#${generateRandom7Digit()}</code>) will be generated automatically.</span>
+          <div class="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300">
+            ✨ A unique <b>7-digit Royal ID</b> (e.g. <code>#8471027</code>) will be generated automatically.
           </div>
         `}
 
-        <button type="submit" id="auth-submit-btn" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl text-sm shadow-lg shadow-blue-500/25 transition-all">
-          ${!isSignUpTab ? 'Sign In to RoyalChat' : 'Complete Sign Up'}
+        <button type="submit" id="auth-submit-btn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-sm shadow-md transition-all">
+          ${!isSignUpTab ? 'Sign In to LogsApp' : 'Complete Sign Up'}
         </button>
       </form>
 
-      <!-- Footer CLI Info -->
-      <div class="p-3 bg-slate-950 border-t border-slateDark-border/40 text-center font-mono text-[11px] text-slate-400">
+      <!-- Server Connection Toggle (for GitHub Pages / Custom Deployments) -->
+      <div class="px-6 py-2 bg-[#0b0f19]/60 border-t border-[#1e293b]/60 text-center">
+        <button id="btn-toggle-server-config" class="text-[11px] text-slate-400 hover:text-blue-400 inline-flex items-center gap-1">
+          <span class="mdi mdi-server-network"></span>
+          <span>Backend Server Settings</span>
+        </button>
+
+        ${state.showServerConfig ? `
+          <div class="mt-2 text-left p-3 bg-[#0b0f19] rounded-xl border border-slate-800 space-y-2">
+            <label class="block text-[11px] text-slate-400">Custom Backend URL (Render / VPS)</label>
+            <div class="flex gap-1.5">
+              <input type="text" id="server-url-input" value="${localStorage.getItem('logsapp_server_url') || ''}" placeholder="https://logsapp.onrender.com" class="flex-1 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-blue-300 placeholder:text-slate-600 focus:outline-none focus:border-blue-500" />
+              <button id="btn-save-server-url" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold">Save</button>
+            </div>
+            <p class="text-[10px] text-slate-500">Connected: <code class="text-blue-400">${currentServer}</code></p>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="p-3 bg-[#0b0f19] border-t border-[#1e293b]/40 text-center font-mono text-[11px] text-slate-400">
         Linux CLI: <code class="text-blue-400 font-bold">logsapp login</code>
       </div>
     </div>
@@ -279,13 +305,26 @@ function renderAuthScreen() {
 }
 
 function bindAuthEvents() {
-  document.getElementById('tab-signin')?.addEventListener('click', () => {
-    isSignUpTab = false;
+  document.getElementById('tab-signin')?.addEventListener('click', () => { isSignUpTab = false; render(); });
+  document.getElementById('tab-signup')?.addEventListener('click', () => { isSignUpTab = true; render(); });
+
+  document.getElementById('btn-toggle-server-config')?.addEventListener('click', () => {
+    state.showServerConfig = !state.showServerConfig;
     render();
   });
-  document.getElementById('tab-signup')?.addEventListener('click', () => {
-    isSignUpTab = true;
-    render();
+
+  document.getElementById('btn-save-server-url')?.addEventListener('click', () => {
+    const input = document.getElementById('server-url-input');
+    if (input) {
+      const val = input.value.trim();
+      if (val) {
+        localStorage.setItem('logsapp_server_url', val.replace(/\/+$/, ''));
+      } else {
+        localStorage.removeItem('logsapp_server_url');
+      }
+      showToast('Backend Server URL updated!', 'success');
+      render();
+    }
   });
 
   const form = document.getElementById('auth-form');
@@ -305,12 +344,8 @@ function bindAuthEvents() {
         const password = document.getElementById('reg-password').value;
         const confirm = document.getElementById('reg-confirm').value;
 
-        if (password !== confirm) {
-          throw new Error('Passwords do not match. Please re-enter your password.');
-        }
-        if (password.length < 6) {
-          throw new Error('Password must be at least 6 characters long.');
-        }
+        if (password !== confirm) throw new Error('Passwords do not match.');
+        if (password.length < 6) throw new Error('Password must be at least 6 characters.');
 
         const data = await API.request('/auth/register', {
           method: 'POST',
@@ -321,7 +356,7 @@ function bindAuthEvents() {
         state.token = data.token;
         localStorage.setItem('logsapp_user', JSON.stringify(data.user));
         localStorage.setItem('logsapp_token', data.token);
-        showToast(`Welcome ${data.user.display_name}! Your Royal ID is #${data.user.royal_id}`, 'success');
+        showToast(`Welcome ${data.user.display_name}! Royal ID: #${data.user.royal_id}`, 'success');
       } else {
         const identifier = document.getElementById('login-identifier').value.trim();
         const password = document.getElementById('login-password').value;
@@ -345,23 +380,23 @@ function bindAuthEvents() {
       errorDiv.classList.remove('hidden');
     } finally {
       submitBtn.disabled = false;
-      submitBtn.innerText = !isSignUpTab ? 'Sign In to RoyalChat' : 'Complete Sign Up';
+      submitBtn.innerText = !isSignUpTab ? 'Sign In to LogsApp' : 'Complete Sign Up';
     }
   });
 }
 
 // ============================================================
-// SIDEBAR COMPONENTS
+// SIDEBAR
 // ============================================================
 function renderSidebarHeader() {
   const avatar = state.user?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${state.user?.username}`;
   return `
-  <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'border-slateDark-border bg-slateDark-surface' : 'border-slateLight-border bg-slate-50'}">
-    <!-- Clickable Profile Trigger -->
+  <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'border-[#1e293b] bg-[#111827]' : 'border-[#e2e8f0] bg-slate-50'}">
+    <!-- Clickable User Profile -->
     <button id="btn-open-profile" class="flex items-center gap-3 p-1 rounded-xl hover:bg-slate-800/40 text-left transition-all group">
       <div class="relative shrink-0">
-        <img src="${avatar}" alt="${state.user?.display_name}" class="w-10 h-10 rounded-xl object-cover bg-slate-900 ring-2 ring-blue-500/40 group-hover:ring-blue-400 transition-all" />
-        <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slateDark-surface rounded-full"></span>
+        <img src="${avatar}" class="w-10 h-10 rounded-xl object-cover bg-slate-900 ring-2 ring-blue-500/40" />
+        <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#111827] rounded-full"></span>
       </div>
       <div class="min-w-0">
         <h4 class="font-semibold text-sm truncate group-hover:text-blue-400 transition-colors">${state.user?.display_name}</h4>
@@ -371,7 +406,7 @@ function renderSidebarHeader() {
       </div>
     </button>
 
-    <!-- Header Action Buttons -->
+    <!-- Header Actions -->
     <div class="flex items-center gap-1 text-slate-400">
       <button id="btn-open-cli" class="p-2 hover:bg-slate-800/40 rounded-xl text-blue-400" title="Linux CLI Companion"><span class="mdi mdi-console text-lg"></span></button>
       <button id="btn-open-storage" class="p-2 hover:bg-slate-800/40 rounded-xl text-amber-400" title="Storage Quota"><span class="mdi mdi-harddisk text-lg"></span></button>
@@ -383,16 +418,15 @@ function renderSidebarHeader() {
 
 function renderSearchBar() {
   return `
-  <div class="p-3 relative ${state.isDark ? 'bg-slateDark-bg' : 'bg-white'}">
-    <div class="relative flex items-center ${state.isDark ? 'bg-slateDark-surface border-slateDark-border/60' : 'bg-slate-100 border-slate-200'} border rounded-xl px-3 py-2">
+  <div class="p-3 relative ${state.isDark ? 'bg-[#0b0f19]' : 'bg-white'}">
+    <div class="relative flex items-center ${state.isDark ? 'bg-[#111827] border-[#1e293b]' : 'bg-slate-100 border-slate-200'} border rounded-xl px-3 py-2">
       <span class="mdi mdi-magnify text-slate-400 mr-2 text-base"></span>
       <input type="text" id="search-input" value="${state.searchQuery}" placeholder="Search username or 7-digit Royal ID..." class="w-full bg-transparent text-sm focus:outline-none placeholder:text-slate-500" />
       ${state.searchQuery ? `<button id="btn-clear-search" class="text-slate-400 hover:text-slate-200"><span class="mdi mdi-close"></span></button>` : ''}
     </div>
 
-    <!-- Live Search Dropdown -->
     ${state.searchQuery && state.searchResults.length > 0 ? `
-      <div class="absolute top-full left-3 right-3 z-30 mt-1 max-h-72 overflow-y-auto bg-slateDark-surface border border-slateDark-border rounded-2xl shadow-2xl divide-y divide-slate-800">
+      <div class="absolute top-full left-3 right-3 z-30 mt-1 max-h-72 overflow-y-auto bg-[#111827] border border-[#1e293b] rounded-2xl shadow-2xl divide-y divide-slate-800">
         ${state.searchResults.map(u => `
           <div class="search-user-item flex items-center gap-3 p-3 hover:bg-slate-800 cursor-pointer transition-colors" data-user-id="${u.id}">
             <img src="${u.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}" class="w-10 h-10 rounded-xl bg-slate-900" />
@@ -422,7 +456,7 @@ function renderChatList() {
   }
 
   return `
-  <div class="flex-1 overflow-y-auto divide-y ${state.isDark ? 'divide-slateDark-border/30' : 'divide-slate-200'}">
+  <div class="flex-1 overflow-y-auto divide-y ${state.isDark ? 'divide-[#1e293b]/60' : 'divide-slate-200'}">
     ${state.chats.map(chat => {
       const isActive = chat.id === state.activeChatId;
       const other = !chat.is_group && chat.other_participants ? chat.other_participants[0] : null;
@@ -451,16 +485,16 @@ function renderChatList() {
 }
 
 // ============================================================
-// CHAT AREA & MESSAGES
+// CHAT AREA
 // ============================================================
 function renderChatArea() {
   const activeChat = state.chats.find(c => c.id === state.activeChatId);
   if (!activeChat) {
     return `
-    <div class="flex-1 h-full flex flex-col items-center justify-center p-8 text-center select-none ${state.isDark ? 'chat-pattern-dark text-slate-400' : 'chat-pattern-light text-slate-500'}">
+    <div class="flex-1 h-full flex flex-col items-center justify-center p-8 text-center select-none ${state.isDark ? 'text-slate-400' : 'text-slate-500'}">
       <div class="max-w-md space-y-4">
-        <div class="flex justify-center">${BRAND_LOGO_SVG}</div>
-        <h2 class="text-2xl font-bold font-heading text-slate-100">RoyalChat Messenger</h2>
+        <div class="flex justify-center">${LOGO_SVG}</div>
+        <h2 class="text-2xl font-bold font-heading text-slate-100">LogsApp Web Chat</h2>
         <p class="text-xs leading-relaxed text-slate-400">Encrypted real-time messaging, voice notes, and 1GB file sharing with zero-sudo Linux terminal sync.</p>
         <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full text-xs font-mono">
           <span class="mdi mdi-console"></span> CLI: logsapp chats
@@ -474,9 +508,9 @@ function renderChatArea() {
   const avatar = activeChat.is_group ? (activeChat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${activeChat.name}`) : (other?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${other?.username}`);
 
   return `
-  <div class="flex-1 h-full flex flex-col ${state.isDark ? 'bg-slateDark-bg' : 'bg-slateLight-bg'} relative">
-    <!-- Top Header -->
-    <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'border-slateDark-border bg-slateDark-surface' : 'border-slateLight-border bg-white'} z-10">
+  <div class="flex-1 h-full flex flex-col ${state.isDark ? 'bg-[#0b0f19]' : 'bg-[#f8fafc]'} relative">
+    <!-- Chat Header -->
+    <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'border-[#1e293b] bg-[#111827]' : 'border-[#e2e8f0] bg-white'} z-10">
       <div class="flex items-center gap-3 min-w-0">
         <button id="btn-chat-back" class="md:hidden p-1 text-slate-400 hover:text-slate-200"><span class="mdi mdi-arrow-left text-xl"></span></button>
         <img src="${avatar}" class="w-10 h-10 rounded-xl object-cover bg-slate-900 border border-slate-700 shrink-0" />
@@ -495,7 +529,7 @@ function renderChatArea() {
     </div>
 
     <!-- Messages Container -->
-    <div id="messages-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-2.5 ${state.isDark ? 'chat-pattern-dark' : 'chat-pattern-light'}">
+    <div id="messages-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-2.5">
       ${state.activeMessages.length === 0 ? `
         <div class="flex flex-col items-center justify-center h-full text-center text-xs text-slate-400 space-y-2">
           <span class="mdi mdi-message-text-outline text-3xl text-blue-500/40"></span>
@@ -506,12 +540,12 @@ function renderChatArea() {
     </div>
 
     <!-- Input Bar -->
-    <div class="p-3 border-t ${state.isDark ? 'border-slateDark-border bg-slateDark-surface' : 'border-slateLight-border bg-white'}">
+    <div class="p-3 border-t ${state.isDark ? 'border-[#1e293b] bg-[#111827]' : 'border-[#e2e8f0] bg-white'}">
       <form id="chat-input-form" class="flex items-center gap-2">
         <input type="file" id="file-upload-input" class="hidden" />
         <button type="button" id="btn-attach-file" class="p-2 text-slate-400 hover:text-blue-400 rounded-xl" title="Attach file (up to 1GB)"><span class="mdi mdi-paperclip text-xl"></span></button>
-        <input type="text" id="chat-message-input" placeholder="Type a message..." class="flex-1 py-2.5 px-4 rounded-xl text-sm ${state.isDark ? 'bg-slateDark-bg border-slateDark-border/60 text-slate-100' : 'bg-slate-100 border-slate-200 text-slate-900'} border focus:outline-none focus:border-blue-500" />
-        <button type="submit" class="p-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl shadow-md shadow-blue-500/25 shrink-0"><span class="mdi mdi-send text-base"></span></button>
+        <input type="text" id="chat-message-input" placeholder="Type a message..." class="flex-1 py-2.5 px-4 rounded-xl text-sm ${state.isDark ? 'bg-[#0b0f19] border-[#1e293b] text-slate-100' : 'bg-slate-100 border-slate-200 text-slate-900'} border focus:outline-none focus:border-blue-500" />
+        <button type="submit" class="p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md shrink-0"><span class="mdi mdi-send text-base"></span></button>
       </form>
     </div>
   </div>`;
@@ -524,7 +558,7 @@ function renderMessageBubble(msg, isMe) {
   return `
   <div class="flex flex-col my-1 ${isMe ? 'items-end' : 'items-start'}">
     <div class="relative max-w-[85%] md:max-w-[70%]">
-      <div class="rounded-2xl px-4 py-2.5 text-sm break-words ${isMe ? 'bubble-sent rounded-tr-none' : (state.isDark ? 'bubble-received-dark rounded-tl-none' : 'bubble-received-light rounded-tl-none')}">
+      <div class="rounded-2xl px-4 py-2.5 text-sm break-words ${isMe ? 'bubble-sent' : (state.isDark ? 'bubble-received-dark' : 'bubble-received-light')}">
         ${msg.message_type === 'image' ? `
           <div class="mb-2 -mx-1.5 -mt-1 rounded-xl overflow-hidden cursor-pointer">
             <img src="${downloadUrl}" class="w-full max-h-72 object-cover" />
@@ -555,7 +589,7 @@ function renderMessageBubble(msg, isMe) {
 }
 
 // ============================================================
-// PROFILE MODAL (7-Digit Royal ID, Avatar Shuffle, Bio, Quota)
+// PROFILE MODAL
 // ============================================================
 function renderProfileModal() {
   const avatar = state.user?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${state.user?.username}`;
@@ -564,17 +598,16 @@ function renderProfileModal() {
 
   return `
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-    <div class="w-full max-w-md bg-slateDark-surface text-slate-100 rounded-3xl shadow-2xl border border-slateDark-border overflow-hidden modal-animate">
-      <div class="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 text-white text-center">
+    <div class="w-full max-w-md bg-[#111827] text-slate-100 rounded-2xl shadow-2xl border border-[#1e293b] overflow-hidden modal-enter">
+      <div class="relative bg-gradient-to-r from-blue-700 to-indigo-700 p-6 text-white text-center">
         <button id="btn-close-profile" class="absolute top-4 right-4 p-1 bg-black/20 hover:bg-black/40 rounded-full"><span class="mdi mdi-close text-lg"></span></button>
-        <img id="profile-modal-avatar" src="${avatar}" class="w-20 h-20 rounded-2xl object-cover mx-auto mb-2 bg-slate-900 ring-4 ring-white/20 shadow-xl" />
+        <img src="${avatar}" class="w-20 h-20 rounded-2xl object-cover mx-auto mb-2 bg-slate-900 ring-4 ring-white/20 shadow-xl" />
         <button id="btn-shuffle-avatar" class="text-xs bg-amber-500 text-slate-950 px-2.5 py-1 rounded-full font-bold shadow hover:bg-amber-400">🎲 Shuffle Avatar</button>
         <h3 class="text-xl font-bold font-heading mt-2">${state.user?.display_name}</h3>
         <p class="text-xs text-blue-100 font-mono">@${state.user?.username}</p>
       </div>
 
-      <!-- 7-Digit Royal ID Banner -->
-      <div class="p-4 bg-slateDark-bg border-b border-slateDark-border/60 flex items-center justify-between">
+      <div class="p-4 bg-[#0b0f19] border-b border-[#1e293b] flex items-center justify-between">
         <div>
           <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">7-Digit Royal ID</span>
           <p class="text-lg font-mono font-extrabold text-amber-400 mt-0.5">#${state.user?.royal_id}</p>
@@ -585,8 +618,7 @@ function renderProfileModal() {
       </div>
 
       <div class="p-6 space-y-4">
-        <!-- Storage Status -->
-        <div class="p-3.5 bg-slateDark-bg border border-slate-800 rounded-xl space-y-1 text-xs">
+        <div class="p-3.5 bg-[#0b0f19] border border-slate-800 rounded-xl space-y-1 text-xs">
           <div class="flex justify-between">
             <span class="text-slate-400">Storage Usage</span>
             <span class="font-mono text-blue-400 font-bold">${usedMb} MB / ${limitMb} MB</span>
@@ -602,16 +634,14 @@ function renderProfileModal() {
   </div>`;
 }
 
-// ============================================================
-// LINUX CLI & COLLEGE LAB MODAL
-// ============================================================
+// CLI Modal
 function renderCLIModal() {
-  const host = window.location.origin;
+  const host = API.getServerHost();
   const installCmd = `curl -fsSL ${host}/api/cli/install.sh | bash`;
 
   return `
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-    <div class="w-full max-w-2xl bg-slateDark-surface text-slate-100 rounded-3xl shadow-2xl border border-slateDark-border overflow-hidden modal-animate">
+    <div class="w-full max-w-2xl bg-[#111827] text-slate-100 rounded-2xl shadow-2xl border border-[#1e293b] overflow-hidden modal-enter">
       <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-950 p-6 text-white flex items-center justify-between border-b border-slate-800">
         <div class="flex items-center gap-3">
           <span class="mdi mdi-console text-3xl text-blue-400"></span>
@@ -626,7 +656,7 @@ function renderCLIModal() {
       <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
         <div>
           <label class="block font-bold text-blue-400 uppercase tracking-wider mb-1">1-Step Install (College User Account Ready)</label>
-          <div class="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-blue-300">
+          <div class="flex items-center justify-between bg-[#0b0f19] p-3 rounded-xl border border-slate-800 font-mono text-blue-300">
             <span class="truncate">${installCmd}</span>
             <button class="btn-copy-text px-2.5 py-1 bg-blue-600 text-white rounded-lg ml-2" data-copy="${installCmd}">Copy</button>
           </div>
@@ -635,11 +665,11 @@ function renderCLIModal() {
         <div class="p-4 bg-blue-950/30 border border-blue-500/30 rounded-2xl space-y-2">
           <h4 class="font-bold text-blue-300">🎓 College Lab Commands</h4>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div class="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+            <div class="p-2.5 bg-[#0b0f19] rounded-xl border border-slate-800">
               <span class="font-mono text-blue-400 font-bold">logsapp pull @friend</span>
               <p class="text-[11px] text-slate-400 mt-0.5">Download all shared files straight into your college lab folder.</p>
             </div>
-            <div class="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+            <div class="p-2.5 bg-[#0b0f19] rounded-xl border border-slate-800">
               <span class="font-mono text-blue-400 font-bold">logsapp push-dir ./lab_code @friend</span>
               <p class="text-[11px] text-slate-400 mt-0.5">Zip & upload your assignment folder (up to 1GB).</p>
             </div>
@@ -647,27 +677,27 @@ function renderCLIModal() {
         </div>
       </div>
 
-      <div class="p-4 bg-slate-950 border-t border-slate-800 flex justify-end">
+      <div class="p-4 bg-[#0b0f19] border-t border-slate-800 flex justify-end">
         <button id="btn-cli-done" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold">Done</button>
       </div>
     </div>
   </div>`;
 }
 
-// Storage Modal Placeholder
+// Storage Modal
 function renderStorageModal() {
   const usedMb = ((Number(state.user?.storage_used_bytes || 0)) / (1024 * 1024)).toFixed(2);
   const limitMb = ((Number(state.user?.storage_limit_bytes || 1073741824)) / (1024 * 1024)).toFixed(0);
 
   return `
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-    <div class="w-full max-w-md bg-slateDark-surface text-slate-100 rounded-3xl shadow-2xl border border-slateDark-border overflow-hidden modal-animate p-6 space-y-4">
+    <div class="w-full max-w-md bg-[#111827] text-slate-100 rounded-2xl shadow-2xl border border-[#1e293b] overflow-hidden modal-enter p-6 space-y-4">
       <div class="flex items-center justify-between">
         <h3 class="font-bold text-lg font-heading flex items-center gap-2 text-amber-400"><span class="mdi mdi-harddisk"></span> Storage & Auto-Purge</h3>
         <button id="btn-close-storage" class="text-slate-400 hover:text-white"><span class="mdi mdi-close text-lg"></span></button>
       </div>
       <p class="text-xs text-slate-400">When your chat reaches its limit, older messages and files are automatically pruned to stay within quota.</p>
-      <div class="p-3.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+      <div class="p-3.5 bg-[#0b0f19] rounded-xl border border-slate-800 text-xs">
         <div class="flex justify-between font-bold text-blue-400"><span>Current Storage:</span><span>${usedMb} MB / ${limitMb} MB</span></div>
       </div>
       <button id="btn-storage-done" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold">Done</button>
@@ -679,7 +709,7 @@ function renderStorageModal() {
 function renderGroupModal() {
   return `
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-    <div class="w-full max-w-md bg-slateDark-surface text-slate-100 rounded-3xl shadow-2xl border border-slateDark-border overflow-hidden modal-animate p-6 space-y-4">
+    <div class="w-full max-w-md bg-[#111827] text-slate-100 rounded-2xl shadow-2xl border border-[#1e293b] overflow-hidden modal-enter p-6 space-y-4">
       <div class="flex items-center justify-between">
         <h3 class="font-bold text-lg font-heading">Create Group Chat</h3>
         <button id="btn-close-group" class="text-slate-400 hover:text-white"><span class="mdi mdi-close text-lg"></span></button>
@@ -687,7 +717,7 @@ function renderGroupModal() {
       <form id="create-group-form" class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">Group Name</label>
-          <input type="text" id="group-name-input" placeholder="e.g. Project Developers" required class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-blue-500" />
+          <input type="text" id="group-name-input" placeholder="e.g. Project Team" required class="w-full px-3.5 py-2.5 bg-[#0b0f19] border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100" />
         </div>
         <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs shadow-md">Create Group</button>
       </form>
@@ -695,16 +725,8 @@ function renderGroupModal() {
   </div>`;
 }
 
-// Lightbox
-function renderLightbox() {
-  return `
-  <div id="lightbox-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 cursor-pointer">
-    <img src="${state.lightboxMedia}" class="max-w-full max-h-full rounded-2xl shadow-2xl" />
-  </div>`;
-}
-
 // ============================================================
-// EVENT HANDLERS & ASYNC DATA SYNC
+// EVENTS & SYNC
 // ============================================================
 async function loadChats() {
   if (!state.token) return;
@@ -727,14 +749,12 @@ async function loadMessages(chatId) {
 }
 
 function bindMainEvents() {
-  // Theme toggle
   document.getElementById('btn-toggle-theme')?.addEventListener('click', () => {
     state.isDark = !state.isDark;
     localStorage.setItem('logsapp_theme', state.isDark ? 'dark' : 'light');
     render();
   });
 
-  // Modal triggers
   document.getElementById('btn-open-profile')?.addEventListener('click', () => { state.showProfile = true; render(); });
   document.getElementById('btn-close-profile')?.addEventListener('click', () => { state.showProfile = false; render(); });
   document.getElementById('btn-profile-done')?.addEventListener('click', () => { state.showProfile = false; render(); });
@@ -750,7 +770,6 @@ function bindMainEvents() {
   document.getElementById('btn-open-group')?.addEventListener('click', () => { state.showGroupModal = true; render(); });
   document.getElementById('btn-close-group')?.addEventListener('click', () => { state.showGroupModal = false; render(); });
 
-  // Copy buttons
   document.querySelectorAll('.btn-copy-text').forEach(btn => {
     btn.addEventListener('click', () => {
       navigator.clipboard.writeText(btn.getAttribute('data-copy') || '');
@@ -765,7 +784,6 @@ function bindMainEvents() {
     }
   });
 
-  // Shuffle Avatar
   document.getElementById('btn-shuffle-avatar')?.addEventListener('click', async () => {
     const seed = Math.random().toString(36).substring(2, 8);
     const newAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${seed}`;
@@ -783,7 +801,6 @@ function bindMainEvents() {
     }
   });
 
-  // Logout
   document.getElementById('btn-logout')?.addEventListener('click', () => {
     localStorage.clear();
     state.user = null;
@@ -792,7 +809,7 @@ function bindMainEvents() {
     render();
   });
 
-  // Search autocomplete
+  // Autocomplete search
   let searchTimer = null;
   const searchInput = document.getElementById('search-input');
   searchInput?.addEventListener('input', (e) => {
@@ -818,7 +835,6 @@ function bindMainEvents() {
     render();
   });
 
-  // Start chat from search result
   document.querySelectorAll('.search-user-item').forEach(item => {
     item.addEventListener('click', async () => {
       const targetUserId = item.getAttribute('data-user-id');
@@ -840,7 +856,6 @@ function bindMainEvents() {
     });
   });
 
-  // Select Chat from Sidebar
   document.querySelectorAll('.chat-list-item').forEach(item => {
     item.addEventListener('click', async () => {
       const chatId = item.getAttribute('data-chat-id');
@@ -853,13 +868,11 @@ function bindMainEvents() {
     });
   });
 
-  // Back button for mobile
   document.getElementById('btn-chat-back')?.addEventListener('click', () => {
     state.mobileView = 'sidebar';
     render();
   });
 
-  // Send Message Form
   const chatForm = document.getElementById('chat-input-form');
   const chatInput = document.getElementById('chat-message-input');
   chatForm?.addEventListener('submit', async (e) => {
@@ -884,7 +897,6 @@ function bindMainEvents() {
     }
   });
 
-  // Attach File Upload (Up to 1GB)
   const fileInput = document.getElementById('file-upload-input');
   document.getElementById('btn-attach-file')?.addEventListener('click', () => {
     fileInput?.click();
@@ -918,7 +930,6 @@ function bindMainEvents() {
     }
   });
 
-  // Create Group
   document.getElementById('create-group-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('group-name-input').value.trim();
@@ -939,15 +950,9 @@ function bindMainEvents() {
       showToast('Failed to create group', 'error');
     }
   });
-
-  // Lightbox close
-  document.getElementById('lightbox-modal')?.addEventListener('click', () => {
-    state.lightboxMedia = null;
-    render();
-  });
 }
 
-// Background Auto-Sync Interval (every 3s for real-time messages on Vercel)
+// 3s Smart Polling
 setInterval(async () => {
   if (state.token && state.activeChatId) {
     try {
@@ -965,7 +970,6 @@ setInterval(async () => {
   }
 }, 3000);
 
-// Initialize App
 (async function init() {
   if (state.token) {
     await loadChats();
