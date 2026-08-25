@@ -41,24 +41,39 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chat, onBack, onRefreshChat 
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch messages when chat changes
+  // Fetch messages when chat changes + periodic sync for Vercel serverless
   useEffect(() => {
     if (!chat) return;
 
     joinChatRoom(chat.id);
     setLoading(true);
 
-    api
-      .get(`/messages/${chat.id}`)
-      .then((res) => {
-        setMessages(res.data.messages || []);
-      })
-      .catch((err) => {
-        console.error('Failed to load messages:', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    const loadMessages = () => {
+      api
+        .get(`/messages/${chat.id}`)
+        .then((res) => {
+          setMessages((prev) => {
+            const incoming: Message[] = res.data.messages || [];
+            if (incoming.length !== prev.length || (incoming.length > 0 && incoming[incoming.length - 1].id !== prev[prev.length - 1]?.id)) {
+              return incoming;
+            }
+            return prev;
+          });
+        })
+        .catch((err) => {
+          console.error('Failed to load messages:', err);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    };
+
+    loadMessages();
+
+    // 3-second smart poll for Vercel serverless environments
+    const pollTimer = setInterval(loadMessages, 3000);
+
+    return () => clearInterval(pollTimer);
   }, [chat?.id]);
 
   // Real-time new message listener in this active chat

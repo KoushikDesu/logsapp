@@ -39,34 +39,58 @@ app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(morgan('dev'));
 
-// Ensure upload directory exists
-const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
+// Ensure upload directory exists (supports Vercel /tmp)
+const defaultUpload = process.env.VERCEL ? '/tmp/uploads' : './uploads';
+const uploadDir = path.resolve(process.env.UPLOAD_DIR || defaultUpload);
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  } catch (e) {
+    console.warn('Could not create upload directory:', e);
+  }
 }
 
 // Serve CLI standalone script directly
-app.get('/api/cli/logsapp-cli.py', (req, res) => {
-  const cliPath = path.resolve('../cli/logsapp-cli.py');
-  if (fs.existsSync(cliPath)) {
+const serveCliScript = (req: express.Request, res: express.Response) => {
+  const cliPaths = [
+    path.resolve('../cli/logsapp-cli.py'),
+    path.resolve('./cli/logsapp-cli.py'),
+    path.resolve(__dirname, '../../cli/logsapp-cli.py')
+  ];
+  const found = cliPaths.find(p => fs.existsSync(p));
+  if (found) {
     res.setHeader('Content-Type', 'text/x-python');
-    res.sendFile(cliPath);
+    res.sendFile(found);
   } else {
     res.status(404).send('CLI script not found');
   }
-});
+};
 
-// Mount API Routes
+app.get('/api/cli/logsapp-cli.py', serveCliScript);
+app.get('/cli/logsapp-cli.py', serveCliScript);
+
+// Mount API Routes (Dual prefix for Vercel & standard Express)
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+
 app.use('/api/chats', chatRoutes);
+app.use('/chats', chatRoutes);
+
 app.use('/api/messages', messageRoutes);
+app.use('/messages', messageRoutes);
+
 app.use('/api/files', fileRoutes);
+app.use('/files', fileRoutes);
+
 app.use('/api/cli', cliRoutes);
+app.use('/cli', cliRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'LogsApp / RoyalChat', version: '1.0.0', time: new Date().toISOString() });
-});
+const healthHandler = (req: express.Request, res: express.Response) => {
+  res.json({ status: 'ok', app: 'LogsApp / RoyalChat', version: '1.0.0', time: new Date().toISOString(), vercel: Boolean(process.env.VERCEL) });
+};
+app.get('/api/health', healthHandler);
+app.get('/health', healthHandler);
 
 // Serve frontend static files if built in production
 const clientDistPath = path.resolve('../client/dist');
