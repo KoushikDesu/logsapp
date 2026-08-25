@@ -5,9 +5,8 @@
   "scripts": {
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
-    "build:server": "npm run build --prefix server",
-    "build:client": "npm run build --prefix client",
-    "start": "npm run start --prefix server",
+    "build": "npm install --prefix client && npm run build --prefix client && npm install --prefix server && npm run build --prefix server",
+    "start": "node server/dist/index.js",
     "migrate": "python server/src/db/migrate.py"
   },
   "keywords": [

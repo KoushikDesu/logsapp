@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: logsapp
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        value: postgresql://postgres.oqtexpxdxueitsghwloj:Kingofstates1119@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+      - key: DIRECT_URL
+        value: postgresql://postgres.oqtexpxdxueitsghwloj:Kingofstates1119@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+      - key: JWT_SECRET
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: MAX_FILE_SIZE
+        value: 1073741824
+      - key: DEFAULT_CHAT_STORAGE_LIMIT
+        value: 1073741824

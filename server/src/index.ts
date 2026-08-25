@@ -68,6 +68,20 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', app: 'LogsApp / RoyalChat', version: '1.0.0', time: new Date().toISOString() });
 });
 
+// Serve frontend static files if built in production
+const clientDistPath = path.resolve('../client/dist');
+const clientDistLocal = path.resolve('./client/dist');
+const distDir = fs.existsSync(clientDistPath) ? clientDistPath : fs.existsSync(clientDistLocal) ? clientDistLocal : null;
+
+if (distDir) {
+  app.use(express.static(distDir));
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(distDir, 'index.html'));
+    }
+  });
+}
+
 // Initialize Socket.io Real-time engine
 setupSocketHandler(io);
 
