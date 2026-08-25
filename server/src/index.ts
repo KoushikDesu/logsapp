@@ -97,12 +97,17 @@ setInterval(async () => {
   }
 }, 10 * 60 * 1000);
 
-// Start Server
-server.listen(PORT, () => {
-  console.log(`=======================================================`);
-  console.log(`🚀 LogsApp / RoyalChat Server running on http://localhost:${PORT}`);
-  console.log(`📦 Max upload limit: 1GB | Auto-Purge Storage Monitor: Active`);
-  console.log(`💬 Real-Time WebSockets: Ready`);
-  console.log(`💻 Linux CLI endpoint: http://localhost:${PORT}/api/cli/install.sh`);
-  console.log(`=======================================================`);
-});
+// Start Server if not imported as a serverless module
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`=======================================================`);
+    console.log(`🚀 LogsApp / RoyalChat Server running on http://localhost:${PORT}`);
+    console.log(`📦 Max upload limit: 1GB | Auto-Purge Storage Monitor: Active`);
+    console.log(`💬 Real-Time WebSockets: Ready`);
+    console.log(`💻 Linux CLI endpoint: http://localhost:${PORT}/api/cli/install.sh`);
+    console.log(`=======================================================`);
+  });
+}
+
+export default app;
+export { app, server, io };
