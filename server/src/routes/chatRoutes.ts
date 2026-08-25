@@ -310,7 +310,6 @@ router.delete('/:chatId/members/:targetUserId', authenticateToken, async (req: A
     const userId = req.user?.id;
 
     if (userId !== targetUserId) {
-      // Check if admin
       const adminCheck = await query(
         "SELECT role FROM chat_participants WHERE chat_id = $1 AND user_id = $2 AND role = 'admin'",
         [chatId, userId]
@@ -319,12 +318,31 @@ router.delete('/:chatId/members/:targetUserId', authenticateToken, async (req: A
         res.status(403).json({ error: 'Only admins can remove members' });
         return;
       }
+      await query('DELETE FROM chat_participants WHERE chat_id = $1 AND user_id = $2', [chatId, targetUserId]);
+      res.json({ message: 'Participant removed' });
+    } else {
+      await query('DELETE FROM chat_participants WHERE chat_id = $1 AND user_id = $2', [chatId, userId]);
+      res.json({ message: 'Left chat successfully' });
     }
-
-    await query('DELETE FROM chat_participants WHERE chat_id = $1 AND user_id = $2', [chatId, targetUserId]);
-    res.json({ message: 'Participant removed' });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to remove member' });
+  }
+});
+
+// Mark chat as read
+router.post('/:chatId/read', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const chatId = req.params.chatId as string;
+    const userId = req.user?.id;
+    await query(
+      `UPDATE chat_participants 
+       SET last_read_at = NOW() 
+       WHERE chat_id = $1 AND user_id = $2`,
+      [chatId, userId]
+    );
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to mark read' });
   }
 });
 

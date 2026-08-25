@@ -1,8 +1,8 @@
 // ============================================================
-// LogsApp — Web Chat (Clean SmartPrep UI & Multi-Host API)
+// LogsApp — Web Chat (Anime Avatars & Unread Glow System)
 // ============================================================
 
-// 2-People Connecting / Chatting Vector Logo
+// Brand Logo SVG (2 People Chatting / Connecting)
 export const LOGO_SVG = `
 <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-blue-600 shadow-md p-1.5 shrink-0">
   <svg viewBox="0 0 32 32" fill="none" class="w-full h-full">
@@ -12,6 +12,47 @@ export const LOGO_SVG = `
     <path d="M15 25C15 22.2386 17.6863 20 21 20C24.3137 20 27 22.2386 27 25" fill="#f59e0b" fill-opacity="0.95" />
   </svg>
 </div>`;
+
+// Curated Anime Avatars (Solo Leveling, Naruto, Jujutsu Kaisen, Bleach, One Piece, AOT, Demon Slayer)
+export const ANIME_AVATARS = [
+  // Solo Leveling
+  { name: 'Sung Jin-Woo (Shadow Monarch)', anime: 'Solo Leveling', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=SungJinwoo&hair=short04&hairColor=0e1111&eyes=variant08&glasses=variant02' },
+  { name: 'Cha Hae-In (Sword Dancer)', anime: 'Solo Leveling', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=ChaHaeIn&hair=long01&hairColor=ffd700&eyes=variant04' },
+  { name: 'Igris Commander', anime: 'Solo Leveling', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=IgrisBlood&colors=red,crimson' },
+  { name: 'Beru (Ant King)', anime: 'Solo Leveling', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=BeruShadow&colors=indigo,purple' },
+
+  // Naruto
+  { name: 'Madara Uchiha (Eternal Mangekyo)', anime: 'Naruto', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=MadaraUchiha&hair=long04&hairColor=0e1111&eyes=variant09' },
+  { name: 'Itachi Uchiha (Crow Genjutsu)', anime: 'Naruto', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=ItachiUchiha&hair=long02&hairColor=1a1a1a&eyes=variant02' },
+  { name: 'Sasuke Uchiha (Rinnegan)', anime: 'Naruto', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=SasukeUchiha&hair=short03&hairColor=111111&eyes=variant06' },
+  { name: 'Naruto Uzumaki (Sage Mode)', anime: 'Naruto', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=NarutoUzumaki&hair=short01&hairColor=ffd700&eyes=variant03' },
+  { name: 'Kakashi Hatake (Copy Ninja)', anime: 'Naruto', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=KakashiHatake&hair=short02&hairColor=cccccc' },
+  { name: 'Minato Namikaze (Yellow Flash)', anime: 'Naruto', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=MinatoNamikaze&hair=short05&hairColor=ffd700&eyes=variant01' },
+
+  // Jujutsu Kaisen
+  { name: 'Gojo Satoru (Six Eyes)', anime: 'Jujutsu Kaisen', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=GojoSatoru&hair=short02&hairColor=ffffff&glasses=variant05' },
+  { name: 'Ryomen Sukuna (King of Curses)', anime: 'Jujutsu Kaisen', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=RyomenSukuna&hair=short01&hairColor=ff69b4&eyes=variant12' },
+  { name: 'Megumi Fushiguro (Shadows)', anime: 'Jujutsu Kaisen', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=MegumiFushiguro&hair=short06&hairColor=000033' },
+  { name: 'Yuta Okkotsu (Special Grade)', anime: 'Jujutsu Kaisen', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=YutaOkkotsu&hair=short04&hairColor=111111' },
+
+  // Bleach
+  { name: 'Ichigo Kurosaki (Bankai)', anime: 'Bleach', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=IchigoKurosaki&hair=short01&hairColor=ff8c00&eyes=variant05' },
+  { name: 'Sosuke Aizen (Kyoka Suigetsu)', anime: 'Bleach', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=SosukeAizen&hair=short02&hairColor=4a2e18' },
+  { name: 'Kenpachi Zaraki (Squad 11)', anime: 'Bleach', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=KenpachiZaraki&hair=short08&hairColor=0e1111&eyes=variant14' },
+
+  // One Piece & Attack on Titan & Demon Slayer
+  { name: 'Roronoa Zoro (King of Hell)', anime: 'One Piece', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=RoronoaZoro&hair=short03&hairColor=00aa44&eyes=variant07' },
+  { name: 'Monkey D. Luffy (Gear 5)', anime: 'One Piece', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=LuffyGear5&hair=short05&hairColor=ffffff&eyes=variant04' },
+  { name: 'Levi Ackerman (Humanity\'s Strongest)', anime: 'Attack on Titan', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=LeviAckerman&hair=short01&hairColor=111111&eyes=variant02' },
+  { name: 'Eren Yeager (Attack Titan)', anime: 'Attack on Titan', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=ErenYeager&hair=long03&hairColor=2d1a0e&eyes=variant10' },
+  { name: 'Tanjiro Kamado (Sun Breathing)', anime: 'Demon Slayer', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=TanjiroKamado&hair=short04&hairColor=8b0000&eyes=variant06' },
+  { name: 'Giyu Tomioka (Water Hashira)', anime: 'Demon Slayer', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=GiyuTomioka&hair=long02&hairColor=000033&eyes=variant02' }
+];
+
+export function getRandomAnimeAvatar() {
+  const index = Math.floor(Math.random() * ANIME_AVATARS.length);
+  return ANIME_AVATARS[index];
+}
 
 // Sound Engine
 class SoundEngine {
@@ -63,31 +104,23 @@ class SoundEngine {
       osc.stop(this.ctx.currentTime + 0.1);
     } catch (e) {}
   }
-  toggle() {
-    this.enabled = !this.enabled;
-    localStorage.setItem('logsapp_sound', this.enabled);
-    return this.enabled;
-  }
 }
 const sounds = new SoundEngine();
 
-// API Helper with GitHub Pages / Vercel / Render detection
+// API Helper
 const API = {
   getBaseUrl() {
     const custom = localStorage.getItem('logsapp_server_url');
     if (custom) return custom.replace(/\/+$/, '') + '/api';
 
-    // When hosted on GitHub Pages or Vercel static, route API to live deployed backend server
     if (typeof window !== 'undefined' && (window.location.hostname.includes('github.io') || window.location.hostname.includes('vercel.app'))) {
       return 'https://logsapp-2vqv.onrender.com/api';
     }
 
-    // Local dev server
     if (typeof window !== 'undefined' && (window.location.port === '3000' || window.location.port === '5173')) {
       return 'http://localhost:5000/api';
     }
 
-    // Default: Render or same-origin
     return 'https://logsapp-2vqv.onrender.com/api';
   },
   getServerHost() {
@@ -109,12 +142,12 @@ const API = {
       const res = await fetch(url, { ...options, headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || `Server returned error (${res.status})`);
+        throw new Error(data.error || `Server error (${res.status})`);
       }
       return data;
     } catch (err) {
       if (err.name === 'TypeError' || err.message.includes('Failed to fetch')) {
-        throw new Error('Could not connect to backend server. If you are on GitHub Pages or Render, please check your server connection.');
+        throw new Error('Connecting to backend server... Please ensure your internet connection is active.');
       }
       throw err;
     }
@@ -136,7 +169,8 @@ const state = {
   showGroupModal: false,
   showStorageModal: false,
   showCLIModal: false,
-  showServerConfig: false
+  showServerConfig: false,
+  showAvatarGrid: false
 };
 
 // Toast Notifications
@@ -159,7 +193,7 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
-// Render Master
+// Master Render
 function render() {
   const root = document.getElementById('app');
   if (!root) return;
@@ -185,7 +219,7 @@ function render() {
         ${renderChatList()}
       </div>
 
-      <!-- Main Chat Area -->
+      <!-- Main Chat -->
       <div class="h-full flex-1 ${state.mobileView === 'chat' ? 'w-full flex flex-col' : 'hidden md:flex flex-col'}">
         ${renderChatArea()}
       </div>
@@ -210,7 +244,6 @@ function renderAuthScreen() {
   const currentServer = API.getBaseUrl().replace(/\/api$/, '');
   return `
   <div class="h-screen w-screen flex items-center justify-center bg-[#0b0f19] p-4 relative overflow-hidden">
-    <!-- Clean Ambient Background -->
     <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
     <div class="relative w-full max-w-md bg-[#111827] text-slate-100 rounded-2xl shadow-2xl border border-[#1e293b] overflow-hidden modal-enter">
@@ -220,7 +253,7 @@ function renderAuthScreen() {
           ${LOGO_SVG}
         </div>
         <h1 class="text-2xl font-bold font-heading tracking-tight">LogsApp</h1>
-        <p class="text-blue-100 text-xs mt-0.5">Web Chat • 1GB File Bridge • Linux Terminal Ready</p>
+        <p class="text-blue-100 text-xs mt-0.5">Web Chat • 1GB File Bridge • Anime Avatars Ready</p>
       </div>
 
       <!-- Tab Switcher -->
@@ -233,7 +266,7 @@ function renderAuthScreen() {
         </button>
       </div>
 
-      <!-- Form Body -->
+      <!-- Form -->
       <form id="auth-form" class="p-6 space-y-4">
         <div id="auth-error" class="hidden p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2"></div>
 
@@ -269,7 +302,7 @@ function renderAuthScreen() {
             <input type="password" id="reg-confirm" placeholder="••••••••" required class="w-full px-3.5 py-2.5 bg-[#0b0f19] border border-[#1e293b] rounded-xl text-sm focus:outline-none focus:border-blue-500 text-slate-100 placeholder:text-slate-500" />
           </div>
           <div class="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300">
-            ✨ A unique <b>7-digit Royal ID</b> (e.g. <code>#8471027</code>) will be generated automatically.
+            ✨ Auto-generates a unique <b>7-digit Royal ID</b> (e.g. <code>#8471027</code>) & Anime Avatar.
           </div>
         `}
 
@@ -278,7 +311,7 @@ function renderAuthScreen() {
         </button>
       </form>
 
-      <!-- Server Connection Toggle (for GitHub Pages / Custom Deployments) -->
+      <!-- Server Config Drawer -->
       <div class="px-6 py-2 bg-[#0b0f19]/60 border-t border-[#1e293b]/60 text-center">
         <button id="btn-toggle-server-config" class="text-[11px] text-slate-400 hover:text-blue-400 inline-flex items-center gap-1">
           <span class="mdi mdi-server-network"></span>
@@ -289,7 +322,7 @@ function renderAuthScreen() {
           <div class="mt-2 text-left p-3 bg-[#0b0f19] rounded-xl border border-slate-800 space-y-2">
             <label class="block text-[11px] text-slate-400">Custom Backend URL (Render / VPS)</label>
             <div class="flex gap-1.5">
-              <input type="text" id="server-url-input" value="${localStorage.getItem('logsapp_server_url') || ''}" placeholder="https://logsapp.onrender.com" class="flex-1 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-blue-300 placeholder:text-slate-600 focus:outline-none focus:border-blue-500" />
+              <input type="text" id="server-url-input" value="${localStorage.getItem('logsapp_server_url') || ''}" placeholder="https://logsapp-2vqv.onrender.com" class="flex-1 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-blue-300 placeholder:text-slate-600 focus:outline-none focus:border-blue-500" />
               <button id="btn-save-server-url" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold">Save</button>
             </div>
             <p class="text-[10px] text-slate-500">Connected: <code class="text-blue-400">${currentServer}</code></p>
@@ -347,9 +380,11 @@ function bindAuthEvents() {
         if (password !== confirm) throw new Error('Passwords do not match.');
         if (password.length < 6) throw new Error('Password must be at least 6 characters.');
 
+        const initialAvatar = getRandomAnimeAvatar().url;
+
         const data = await API.request('/auth/register', {
           method: 'POST',
-          body: JSON.stringify({ display_name: displayName, username, password })
+          body: JSON.stringify({ display_name: displayName, username, password, avatar_url: initialAvatar })
         });
 
         state.user = data.user;
@@ -389,13 +424,13 @@ function bindAuthEvents() {
 // SIDEBAR
 // ============================================================
 function renderSidebarHeader() {
-  const avatar = state.user?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${state.user?.username}`;
+  const avatar = state.user?.avatar_url || getRandomAnimeAvatar().url;
   return `
   <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'border-[#1e293b] bg-[#111827]' : 'border-[#e2e8f0] bg-slate-50'}">
     <!-- Clickable User Profile -->
     <button id="btn-open-profile" class="flex items-center gap-3 p-1 rounded-xl hover:bg-slate-800/40 text-left transition-all group">
       <div class="relative shrink-0">
-        <img src="${avatar}" class="w-10 h-10 rounded-xl object-cover bg-slate-900 ring-2 ring-blue-500/40" />
+        <img src="${avatar}" class="w-10 h-10 rounded-xl object-cover bg-slate-900 ring-2 ring-blue-500/50 shadow-md" />
         <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#111827] rounded-full"></span>
       </div>
       <div class="min-w-0">
@@ -429,7 +464,7 @@ function renderSearchBar() {
       <div class="absolute top-full left-3 right-3 z-30 mt-1 max-h-72 overflow-y-auto bg-[#111827] border border-[#1e293b] rounded-2xl shadow-2xl divide-y divide-slate-800">
         ${state.searchResults.map(u => `
           <div class="search-user-item flex items-center gap-3 p-3 hover:bg-slate-800 cursor-pointer transition-colors" data-user-id="${u.id}">
-            <img src="${u.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}" class="w-10 h-10 rounded-xl bg-slate-900" />
+            <img src="${u.avatar_url || getRandomAnimeAvatar().url}" class="w-10 h-10 rounded-xl bg-slate-900 ring-1 ring-blue-500/30" />
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between">
                 <h5 class="text-sm font-semibold truncate">${u.display_name}</h5>
@@ -461,22 +496,35 @@ function renderChatList() {
       const isActive = chat.id === state.activeChatId;
       const other = !chat.is_group && chat.other_participants ? chat.other_participants[0] : null;
       const title = chat.is_group ? chat.name : (other?.display_name || 'Direct Chat');
-      const avatar = chat.is_group ? (chat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${chat.name}`) : (other?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${other?.username}`);
+      const avatar = chat.is_group ? (chat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${chat.name}`) : (other?.avatar_url || getRandomAnimeAvatar().url);
       const lastMsg = chat.last_message ? (chat.last_message.message_type !== 'text' ? `📎 [${chat.last_message.message_type.toUpperCase()}] ${chat.last_message.file_name || ''}` : chat.last_message.content) : 'No messages yet';
       const time = chat.last_message?.created_at ? new Date(chat.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const unreadCount = Number(chat.unread_count || 0);
+      const hasUnread = unreadCount > 0;
 
       return `
-      <div class="chat-list-item flex items-center gap-3 p-3.5 cursor-pointer transition-colors ${isActive ? 'bg-blue-600/15 border-l-4 border-blue-500' : 'hover:bg-slate-800/30'}" data-chat-id="${chat.id}">
+      <div class="chat-list-item relative flex items-center gap-3 p-3.5 cursor-pointer transition-colors ${isActive ? 'bg-blue-600/15 border-l-4 border-blue-500' : 'hover:bg-slate-800/30'}" data-chat-id="${chat.id}">
+        <!-- Avatar with unread indicator dot -->
         <div class="relative shrink-0">
-          <img src="${avatar}" class="w-12 h-12 rounded-xl object-cover bg-slate-900 border border-slate-700" />
+          <img src="${avatar}" class="w-12 h-12 rounded-xl object-cover bg-slate-900 border border-slate-700 ring-1 ring-white/10" />
           ${chat.is_group ? `<span class="absolute -bottom-1 -right-1 p-0.5 bg-blue-600 text-white rounded-full text-[10px] mdi mdi-account-multiple"></span>` : ''}
+          ${hasUnread ? `<span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 border-2 border-[#111827] rounded-full shadow-lg shadow-blue-500/50 animate-pulse"></span>` : ''}
         </div>
+
         <div class="flex-1 min-w-0">
           <div class="flex items-center justify-between">
-            <h4 class="font-semibold text-sm truncate">${title}</h4>
-            <span class="text-[11px] text-slate-500 shrink-0 ml-2">${time}</span>
+            <h4 class="font-semibold text-sm truncate ${hasUnread ? 'text-blue-300 font-bold' : ''}">${title}</h4>
+            <div class="flex items-center gap-1.5 shrink-0 ml-2">
+              <span class="text-[11px] ${hasUnread ? 'text-blue-400 font-semibold' : 'text-slate-500'}">${time}</span>
+              ${hasUnread ? `<span class="w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-blue-500/20 animate-ping"></span>` : ''}
+            </div>
           </div>
-          <p class="text-xs text-slate-400 truncate mt-1">${lastMsg}</p>
+
+          <div class="flex items-center justify-between mt-1">
+            <p class="text-xs ${hasUnread ? 'text-slate-100 font-semibold' : 'text-slate-400'} truncate flex-1">${lastMsg}</p>
+            ${hasUnread ? `<span class="bg-blue-600 text-white font-bold text-[10px] px-1.5 py-0.2 rounded-full shadow-md shrink-0 ml-2">${unreadCount}</span>` : ''}
+          </div>
+
           ${other ? `<span class="inline-block mt-1 text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20 font-bold">#${other.royal_id}</span>` : ''}
         </div>
       </div>`;
@@ -495,7 +543,7 @@ function renderChatArea() {
       <div class="max-w-md space-y-4">
         <div class="flex justify-center">${LOGO_SVG}</div>
         <h2 class="text-2xl font-bold font-heading text-slate-100">LogsApp Web Chat</h2>
-        <p class="text-xs leading-relaxed text-slate-400">Encrypted real-time messaging, voice notes, and 1GB file sharing with zero-sudo Linux terminal sync.</p>
+        <p class="text-xs leading-relaxed text-slate-400">Encrypted real-time messaging, voice notes, anime avatars, and 1GB file sharing with zero-sudo Linux terminal sync.</p>
         <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full text-xs font-mono">
           <span class="mdi mdi-console"></span> CLI: logsapp chats
         </div>
@@ -505,7 +553,7 @@ function renderChatArea() {
 
   const other = !activeChat.is_group && activeChat.other_participants ? activeChat.other_participants[0] : null;
   const title = activeChat.is_group ? activeChat.name : (other?.display_name || 'Direct Chat');
-  const avatar = activeChat.is_group ? (activeChat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${activeChat.name}`) : (other?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${other?.username}`);
+  const avatar = activeChat.is_group ? (activeChat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${activeChat.name}`) : (other?.avatar_url || getRandomAnimeAvatar().url);
 
   return `
   <div class="flex-1 h-full flex flex-col ${state.isDark ? 'bg-[#0b0f19]' : 'bg-[#f8fafc]'} relative">
@@ -513,7 +561,7 @@ function renderChatArea() {
     <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'border-[#1e293b] bg-[#111827]' : 'border-[#e2e8f0] bg-white'} z-10">
       <div class="flex items-center gap-3 min-w-0">
         <button id="btn-chat-back" class="md:hidden p-1 text-slate-400 hover:text-slate-200"><span class="mdi mdi-arrow-left text-xl"></span></button>
-        <img src="${avatar}" class="w-10 h-10 rounded-xl object-cover bg-slate-900 border border-slate-700 shrink-0" />
+        <img src="${avatar}" class="w-10 h-10 rounded-xl object-cover bg-slate-900 border border-slate-700 shrink-0 ring-1 ring-blue-500/30" />
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <h3 class="font-semibold text-sm truncate">${title}</h3>
@@ -589,25 +637,47 @@ function renderMessageBubble(msg, isMe) {
 }
 
 // ============================================================
-// PROFILE MODAL
+// PROFILE MODAL (With Anime Avatar Selector & Shuffle)
 // ============================================================
 function renderProfileModal() {
-  const avatar = state.user?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${state.user?.username}`;
+  const avatar = state.user?.avatar_url || getRandomAnimeAvatar().url;
+  const currentAnime = ANIME_AVATARS.find(a => a.url === avatar);
   const usedMb = ((Number(state.user?.storage_used_bytes || 0)) / (1024 * 1024)).toFixed(2);
   const limitMb = ((Number(state.user?.storage_limit_bytes || 1073741824)) / (1024 * 1024)).toFixed(0);
 
   return `
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-    <div class="w-full max-w-md bg-[#111827] text-slate-100 rounded-2xl shadow-2xl border border-[#1e293b] overflow-hidden modal-enter">
-      <div class="relative bg-gradient-to-r from-blue-700 to-indigo-700 p-6 text-white text-center">
+    <div class="w-full max-w-lg bg-[#111827] text-slate-100 rounded-2xl shadow-2xl border border-[#1e293b] overflow-hidden modal-enter max-h-[90vh] flex flex-col">
+      <!-- Top Banner -->
+      <div class="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-6 text-white text-center shrink-0">
         <button id="btn-close-profile" class="absolute top-4 right-4 p-1 bg-black/20 hover:bg-black/40 rounded-full"><span class="mdi mdi-close text-lg"></span></button>
-        <img src="${avatar}" class="w-20 h-20 rounded-2xl object-cover mx-auto mb-2 bg-slate-900 ring-4 ring-white/20 shadow-xl" />
-        <button id="btn-shuffle-avatar" class="text-xs bg-amber-500 text-slate-950 px-2.5 py-1 rounded-full font-bold shadow hover:bg-amber-400">🎲 Shuffle Avatar</button>
+        
+        <div class="relative inline-block mx-auto mb-2">
+          <img src="${avatar}" class="w-24 h-24 rounded-2xl object-cover bg-slate-950 ring-4 ring-amber-400/80 shadow-2xl shadow-blue-500/50" />
+          <span class="absolute -bottom-2 -right-2 p-1 bg-amber-500 text-slate-950 rounded-full text-xs font-bold shadow" title="Anime Avatar">⚡</span>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mt-1">
+          <button id="btn-shuffle-avatar" class="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-full font-bold shadow-md flex items-center gap-1.5 transition-all">
+            <span>🎲 Shuffle Anime Avatar</span>
+          </button>
+          <button id="btn-toggle-avatar-grid" class="text-xs bg-blue-500/30 hover:bg-blue-500/50 text-white border border-blue-400/40 px-3 py-1.5 rounded-full font-semibold flex items-center gap-1 transition-all">
+            <span class="mdi mdi-grid"></span> Pick Character
+          </button>
+        </div>
+
+        ${currentAnime ? `
+          <div class="mt-2 text-xs font-semibold text-amber-300 font-heading">
+            ✨ ${currentAnime.name} <span class="opacity-75 font-normal font-sans">(${currentAnime.anime})</span>
+          </div>
+        ` : ''}
+
         <h3 class="text-xl font-bold font-heading mt-2">${state.user?.display_name}</h3>
         <p class="text-xs text-blue-100 font-mono">@${state.user?.username}</p>
       </div>
 
-      <div class="p-4 bg-[#0b0f19] border-b border-[#1e293b] flex items-center justify-between">
+      <!-- 7-Digit Royal ID Bar -->
+      <div class="p-4 bg-[#0b0f19] border-b border-[#1e293b] flex items-center justify-between shrink-0">
         <div>
           <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">7-Digit Royal ID</span>
           <p class="text-lg font-mono font-extrabold text-amber-400 mt-0.5">#${state.user?.royal_id}</p>
@@ -617,7 +687,25 @@ function renderProfileModal() {
         </button>
       </div>
 
-      <div class="p-6 space-y-4">
+      <!-- Body / Character Picker Grid -->
+      <div class="p-6 space-y-4 overflow-y-auto flex-1">
+        ${state.showAvatarGrid ? `
+          <div class="space-y-2 p-3 bg-[#0b0f19] rounded-2xl border border-slate-800">
+            <div class="flex items-center justify-between text-xs text-slate-400 font-bold uppercase">
+              <span>Choose Your Anime Hero</span>
+              <span class="text-[10px] text-amber-400">${ANIME_AVATARS.length} Characters</span>
+            </div>
+            <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1">
+              ${ANIME_AVATARS.map((av, idx) => `
+                <div class="avatar-option-item flex flex-col items-center p-1.5 rounded-xl cursor-pointer hover:bg-blue-600/20 border ${av.url === avatar ? 'border-amber-400 bg-amber-400/10' : 'border-slate-800'} transition-all" data-url="${av.url}">
+                  <img src="${av.url}" class="w-11 h-11 rounded-lg object-cover bg-slate-900" />
+                  <span class="text-[9px] text-slate-300 font-semibold truncate w-full text-center mt-1">${av.name.split(' ')[0]}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
         <div class="p-3.5 bg-[#0b0f19] border border-slate-800 rounded-xl space-y-1 text-xs">
           <div class="flex justify-between">
             <span class="text-slate-400">Storage Usage</span>
@@ -743,6 +831,11 @@ async function loadMessages(chatId) {
   try {
     const data = await API.request(`/messages/${chatId}`);
     state.activeMessages = data.messages || [];
+    // Mark chat as read
+    API.request(`/chats/${chatId}/read`, { method: 'POST' }).catch(() => {});
+    // Clear local unread badge
+    const chat = state.chats.find(c => c.id === chatId);
+    if (chat) chat.unread_count = 0;
   } catch (e) {
     console.error('Failed to load messages:', e);
   }
@@ -770,6 +863,31 @@ function bindMainEvents() {
   document.getElementById('btn-open-group')?.addEventListener('click', () => { state.showGroupModal = true; render(); });
   document.getElementById('btn-close-group')?.addEventListener('click', () => { state.showGroupModal = false; render(); });
 
+  document.getElementById('btn-toggle-avatar-grid')?.addEventListener('click', () => {
+    state.showAvatarGrid = !state.showAvatarGrid;
+    render();
+  });
+
+  document.querySelectorAll('.avatar-option-item').forEach(item => {
+    item.addEventListener('click', async () => {
+      const selectedUrl = item.getAttribute('data-url');
+      if (!selectedUrl) return;
+      try {
+        await API.request('/auth/me', {
+          method: 'PUT',
+          body: JSON.stringify({ avatar_url: selectedUrl })
+        });
+        state.user.avatar_url = selectedUrl;
+        localStorage.setItem('logsapp_user', JSON.stringify(state.user));
+        sounds.playSent();
+        render();
+        showToast('Anime Avatar selected!', 'success');
+      } catch (e) {
+        showToast('Failed to update avatar', 'error');
+      }
+    });
+  });
+
   document.querySelectorAll('.btn-copy-text').forEach(btn => {
     btn.addEventListener('click', () => {
       navigator.clipboard.writeText(btn.getAttribute('data-copy') || '');
@@ -784,18 +902,19 @@ function bindMainEvents() {
     }
   });
 
+  // Shuffle Anime Avatar
   document.getElementById('btn-shuffle-avatar')?.addEventListener('click', async () => {
-    const seed = Math.random().toString(36).substring(2, 8);
-    const newAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${seed}`;
+    const randomAnime = getRandomAnimeAvatar();
     try {
-      await API.request('/auth/profile', {
+      await API.request('/auth/me', {
         method: 'PUT',
-        body: JSON.stringify({ avatar_url: newAvatar })
+        body: JSON.stringify({ avatar_url: randomAnime.url })
       });
-      state.user.avatar_url = newAvatar;
+      state.user.avatar_url = randomAnime.url;
       localStorage.setItem('logsapp_user', JSON.stringify(state.user));
+      sounds.playSent();
       render();
-      showToast('New Avatar generated!', 'success');
+      showToast(`Shuffled to ${randomAnime.name}!`, 'success');
     } catch (e) {
       showToast('Failed to update avatar', 'error');
     }
