@@ -1,0 +1,28 @@
+# LogsApp Git Ignore
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build artifacts
+dist/
+build/
+*/dist/
+
+# Environment Variables
+.env
+.env.local
+.env.production
+
+# Session files & temporary CLI caches
+.logsapp_session.json
+*.pyc
+__pycache__/
+
+# Uploads directory contents (preserve folder structure)
+uploads/*
+!uploads/.gitkeep
+
+# System files
+.DS_Store
+Thumbs.db
