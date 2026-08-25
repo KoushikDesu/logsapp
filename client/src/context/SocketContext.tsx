@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext.js';
 import { Message, TypingUser } from '../types/index.js';
 import { sounds } from '../services/sound.js';
+import { getServerOrigin } from '../services/api.js';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -34,17 +35,25 @@ export const SocketProvider: React.FC<{
       return;
     }
 
-    const socketHost = window.location.port === '3000' ? 'http://localhost:5000' : window.location.origin;
-    const newSocket = io(socketHost, {
-      auth: { token },
-      query: { token },
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 10,
-    });
+    const socketHost = getServerOrigin();
+    let newSocket: Socket | null = null;
 
-    newSocket.on('connect', () => {
-      console.log('[Socket] Connected as', user.username);
-    });
+    try {
+      newSocket = io(socketHost, {
+        auth: { token },
+        query: { token },
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 5,
+        timeout: 10000,
+      });
+
+      newSocket.on('connect_error', (err) => {
+        console.warn('[Socket Notice] WebSocket connection fallback to HTTP polling:', err.message);
+      });
+
+      newSocket.on('connect', () => {
+        console.log('[Socket] Connected as', user.username);
+      });
 
     newSocket.on('user_status', (data: { userId: string; isOnline: boolean }) => {
       setOnlineUserIds((prev) => {

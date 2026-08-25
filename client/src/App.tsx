@@ -1,12 +1,61 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { ThemeProvider, useTheme } from './context/ThemeContext.js';
 import { SocketProvider } from './context/SocketContext.js';
 import { AuthModal } from './components/Auth/AuthModal.js';
 import { Sidebar } from './components/Sidebar/Sidebar.js';
 import { ChatArea } from './components/Chat/ChatArea.js';
+import { BrandLogo } from './components/Common/BrandLogo.js';
 import { Chat, Message } from './types/index.js';
 import api from './services/api.js';
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('UI Render Error caught by ErrorBoundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-slate-100 p-6 text-center space-y-4 select-none">
+          <BrandLogo size="lg" showText={false} />
+          <h2 className="text-xl font-bold font-heading">Something went wrong</h2>
+          <p className="text-xs text-slate-400 max-w-sm">
+            {this.state.error?.message || 'An unexpected rendering error occurred.'}
+          </p>
+          <button
+            onClick={() => {
+              localStorage.clear();
+              window.location.reload();
+            }}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl shadow-lg transition-all"
+          >
+            Reset Session & Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const MainLayout: React.FC = () => {
   const { user, token, loading } = useAuth();
@@ -64,10 +113,11 @@ const MainLayout: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#111b21] text-emerald-500">
+      <div className="h-screen w-screen flex items-center justify-center bg-slateDark-bg text-blue-500 select-none">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <span className="font-semibold text-sm tracking-wide">Loading LogsApp...</span>
+          <BrandLogo size="lg" showText={false} />
+          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mt-2" />
+          <span className="font-semibold text-xs tracking-wide text-slate-400">Loading RoyalChat...</span>
         </div>
       </div>
     );
@@ -81,11 +131,11 @@ const MainLayout: React.FC = () => {
 
   return (
     <SocketProvider onNewMessage={handleNewMessage}>
-      <div className="h-screen w-screen flex overflow-hidden bg-wa-dark-bg text-wa-dark-text select-none">
+      <div className="h-screen w-screen flex overflow-hidden bg-slateDark-bg dark:bg-slateDark-bg bg-slate-50 text-slateDark-text dark:text-slateDark-text text-slate-900 select-none">
         {/* Sidebar (Desktop visible, Mobile conditionally visible) */}
         <div
           className={`h-full ${
-            mobileView === 'sidebar' ? 'w-full block' : 'hidden md:block'
+            mobileView === 'sidebar' ? 'w-full md:w-[380px] lg:w-[420px] block' : 'hidden md:block'
           }`}
         >
           <Sidebar
@@ -119,11 +169,13 @@ const MainLayout: React.FC = () => {
 
 export function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <MainLayout />
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <MainLayout />
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
