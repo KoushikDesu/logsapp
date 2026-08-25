@@ -7,46 +7,48 @@ import { authenticateToken, AuthRequest } from '../middleware/authMiddleware.js'
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'logsapp_royal_secret_jwt_key_2026_super_secure_token';
 
-// Helper to generate unique RoyalID
-function generateRoyalId(prefix = 'ROYAL'): string {
-  const randomNum = Math.floor(1000 + Math.random() * 9000);
-  const randomAlpha = Math.random().toString(36).substring(2, 5).toUpperCase();
-  return `${prefix}-${randomNum}${randomAlpha}`;
+// Helper to generate unique 7-digit numeric RoyalID
+function generateRoyalId(): string {
+  // Pure 7-digit numerical ID (e.g. 7482910)
+  const num = Math.floor(1000000 + Math.random() * 9000000);
+  return String(num);
 }
 
 // Register
 router.post('/register', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    let { username, password, display_name, royal_id, email, avatar_url } = req.body;
+    let { username, password, display_name, email, avatar_url } = req.body;
 
     if (!username || !password || !display_name) {
-      res.status(400).json({ error: 'Username, password, and display name are required' });
+      res.status(400).json({ error: 'Display Name, Username, and Password are required' });
       return;
     }
 
-    username = username.trim().toLowerCase();
-    if (!royal_id || !royal_id.trim()) {
-      royal_id = generateRoyalId();
-    } else {
-      royal_id = royal_id.trim().toUpperCase();
+    username = username.trim().toLowerCase().replace(/^@+/, '');
+    
+    // Auto-generate 7-digit numerical RoyalID
+    let royal_id = generateRoyalId();
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 10) {
+      const checkId = await query('SELECT id FROM users WHERE royal_id = $1', [royal_id]);
+      if (checkId.rows.length === 0) {
+        isUnique = true;
+      } else {
+        royal_id = generateRoyalId();
+        attempts++;
+      }
     }
 
-    // Check if username or royal_id already exists
+    // Check if username already exists
     const existing = await query(
-      'SELECT id, username, royal_id FROM users WHERE username = $1 OR royal_id = $2',
-      [username, royal_id]
+      'SELECT id, username FROM users WHERE username = $1',
+      [username]
     );
 
     if (existing.rows.length > 0) {
-      const match = existing.rows[0];
-      if (match.username === username) {
-        res.status(409).json({ error: 'Username already taken. Please pick another.' });
-        return;
-      }
-      if (match.royal_id === royal_id) {
-        res.status(409).json({ error: 'RoyalID already in use. Please choose another or let us generate one.' });
-        return;
-      }
+      res.status(409).json({ error: 'Username already taken. Please pick another.' });
+      return;
     }
 
     const salt = await bcrypt.genSalt(10);

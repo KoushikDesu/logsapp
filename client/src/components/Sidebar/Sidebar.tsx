@@ -11,11 +11,9 @@ import {
   Volume2,
   VolumeX,
   LogOut,
-  Crown,
-  CheckCheck,
-  Check,
-  MoreVertical,
-  X
+  Sparkles,
+  X,
+  User as UserIcon
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
 import { useTheme } from '../../context/ThemeContext.js';
@@ -23,10 +21,12 @@ import { useSocket } from '../../context/SocketContext.js';
 import { Chat, User } from '../../types/index.js';
 import api from '../../services/api.js';
 import { sounds } from '../../services/sound.js';
+import { BrandLogo } from '../Common/BrandLogo.js';
 import { LiveSearchDropdown } from './LiveSearchDropdown.js';
 import { CreateGroupModal } from './CreateGroupModal.js';
 import { StorageModal } from '../Storage/StorageModal.js';
 import { CLIModal } from '../CLI/CLIModal.js';
+import { ProfileModal } from '../Auth/ProfileModal.js';
 
 interface SidebarProps {
   chats: Chat[];
@@ -51,9 +51,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
+  
+  // Modals
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showCLIModal, setShowCLIModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(sounds.isEnabled());
 
   // Live Typeahead search as the user types
@@ -102,102 +105,97 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
 
   return (
-    <div className="w-full md:w-[380px] lg:w-[420px] h-full flex flex-col bg-wa-dark-bg dark:bg-wa-dark-bg bg-white border-r border-wa-dark-border dark:border-wa-dark-border shrink-0 select-none">
-      {/* Top Profile & Actions Header */}
-      <div className="h-16 px-4 flex items-center justify-between bg-wa-dark-panel dark:bg-wa-dark-panel bg-[#f0f2f5] border-b border-wa-dark-border dark:border-wa-dark-border">
-        {/* User Profile Info */}
-        <div className="flex items-center gap-3 min-w-0">
+    <div className="w-full md:w-[380px] lg:w-[420px] h-full flex flex-col bg-slateDark-bg dark:bg-slateDark-bg bg-white border-r border-slateDark-border dark:border-slateDark-border shrink-0 select-none">
+      {/* Top Header with Brand Logo & User Profile Trigger */}
+      <div className="h-16 px-4 flex items-center justify-between bg-slateDark-surface dark:bg-slateDark-surface bg-slate-50 border-b border-slateDark-border dark:border-slateDark-border">
+        {/* User Profile Button (Click to open Profile Modal) */}
+        <button
+          type="button"
+          onClick={() => setShowProfileModal(true)}
+          className="flex items-center gap-3 min-w-0 p-1 rounded-xl hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-200/60 transition-all text-left group"
+          title="Click to view & edit Profile / Royal ID"
+        >
           <div className="relative shrink-0">
             <img
               src={user?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.username}`}
               alt={user?.display_name}
-              className="w-10 h-10 rounded-full object-cover border border-wa-dark-border ring-1 ring-emerald-500/40"
+              className="w-10 h-10 rounded-xl object-cover bg-slate-900 ring-2 ring-blue-500/40 group-hover:ring-blue-400 transition-all"
             />
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-wa-dark-panel rounded-full" />
+            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slateDark-surface rounded-full" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h3 className="font-semibold text-sm truncate text-wa-dark-text dark:text-wa-dark-text text-gray-900">
+            <div className="flex items-center gap-1">
+              <h3 className="font-semibold text-sm truncate text-slateDark-text dark:text-slateDark-text text-slate-900 group-hover:text-blue-400 transition-colors">
                 {user?.display_name}
               </h3>
             </div>
             <div className="flex items-center gap-1">
               <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-                <Crown className="w-2.5 h-2.5" />
-                {user?.royal_id}
+                #{user?.royal_id}
               </span>
             </div>
           </div>
-        </div>
+        </button>
 
-        {/* Action Icon Buttons */}
-        <div className="flex items-center gap-1 text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-600">
+        {/* Header Action Buttons */}
+        <div className="flex items-center gap-1 text-slate-400">
           {/* CLI Companion Button */}
           <button
             onClick={() => setShowCLIModal(true)}
-            className="p-2 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-200 rounded-full text-emerald-400 transition-colors"
+            className="p-2 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-200 rounded-xl text-blue-400 transition-colors"
             title="Linux CLI Terminal Tool"
           >
-            <Terminal className="w-5 h-5" />
+            <Terminal className="w-4 h-4" />
           </button>
 
           {/* Storage Meter Button */}
           <button
             onClick={() => setShowStorageModal(true)}
-            className="p-2 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-200 rounded-full text-amber-400 transition-colors"
-            title="Storage & Auto-Purge Manager"
+            className="p-2 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-200 rounded-xl text-amber-400 transition-colors"
+            title="Storage & Auto-Purge"
           >
-            <HardDrive className="w-5 h-5" />
+            <HardDrive className="w-4 h-4" />
           </button>
 
           {/* New Group Button */}
           <button
             onClick={() => setShowGroupModal(true)}
-            className="p-2 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-200 rounded-full transition-colors"
+            className="p-2 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-200 rounded-xl transition-colors"
             title="New Group Chat"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
           </button>
 
-          {/* Theme Toggle Button */}
+          {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="p-2 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-200 rounded-full transition-colors"
+            className="p-2 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-200 rounded-xl transition-colors"
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {isDark ? <Sun className="w-5 h-5 text-amber-300" /> : <Moon className="w-5 h-5 text-indigo-600" />}
+            {isDark ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-indigo-600" />}
           </button>
 
-          {/* Sound Toggle Button */}
+          {/* Sound Toggle */}
           <button
             onClick={handleToggleSound}
-            className="p-2 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-200 rounded-full transition-colors"
-            title={soundEnabled ? 'Mute Notification Sounds' : 'Unmute Sounds'}
+            className="p-2 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-200 rounded-xl transition-colors"
+            title={soundEnabled ? 'Mute Sounds' : 'Unmute Sounds'}
           >
-            {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5 text-gray-500" />}
-          </button>
-
-          {/* Logout Button */}
-          <button
-            onClick={logout}
-            className="p-2 hover:bg-red-500/10 text-gray-400 hover:text-red-400 rounded-full transition-colors"
-            title="Logout"
-          >
-            <LogOut className="w-4 h-4" />
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
           </button>
         </div>
       </div>
 
       {/* Live Search & Autocomplete Input */}
-      <div className="p-2.5 bg-wa-dark-bg dark:bg-wa-dark-bg bg-white relative">
-        <div className="relative flex items-center bg-wa-dark-panel dark:bg-wa-dark-panel bg-gray-100 rounded-xl px-3 py-1.5 focus-within:ring-1 focus-within:ring-emerald-500 border border-transparent focus-within:border-emerald-500 transition-all">
-          <Search className="w-4 h-4 text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-400 shrink-0 mr-2" />
+      <div className="p-3 bg-slateDark-bg dark:bg-slateDark-bg bg-white relative">
+        <div className="relative flex items-center bg-slateDark-surface dark:bg-slateDark-surface bg-slate-100 rounded-xl px-3 py-2 focus-within:ring-1 focus-within:ring-blue-500 border border-slateDark-border/60 focus-within:border-blue-500 transition-all">
+          <Search className="w-4 h-4 text-slate-400 shrink-0 mr-2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search username or RoyalID..."
-            className="w-full bg-transparent text-sm text-wa-dark-text dark:text-wa-dark-text text-gray-900 placeholder:text-wa-dark-subtext dark:placeholder:text-wa-dark-subtext placeholder:text-gray-400 focus:outline-none"
+            placeholder="Search by username or 7-digit Royal ID..."
+            className="w-full bg-transparent text-sm text-slateDark-text dark:text-slateDark-text text-slate-900 placeholder:text-slate-500 focus:outline-none"
           />
           {searchQuery && (
             <button
@@ -205,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setSearchQuery('');
                 setSearchResults([]);
               }}
-              className="text-gray-400 hover:text-white"
+              className="text-slate-400 hover:text-slate-200"
             >
               <X className="w-4 h-4" />
             </button>
@@ -226,33 +224,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Filter Tabs (All, Direct, Groups) */}
-      <div className="px-3 py-1 flex items-center gap-1.5 border-b border-wa-dark-border/40 text-xs font-semibold">
+      <div className="px-3 py-1.5 flex items-center gap-1.5 border-b border-slateDark-border/40 text-xs font-semibold">
         <button
           onClick={() => setActiveTab('all')}
-          className={`px-3 py-1 rounded-full transition-all ${
+          className={`px-3 py-1 rounded-xl transition-all ${
             activeTab === 'all'
-              ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
-              : 'text-wa-dark-subtext hover:bg-wa-dark-hover'
+              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+              : 'text-slate-400 hover:bg-slateDark-hover'
           }`}
         >
           All Chats
         </button>
         <button
           onClick={() => setActiveTab('direct')}
-          className={`px-3 py-1 rounded-full transition-all ${
+          className={`px-3 py-1 rounded-xl transition-all ${
             activeTab === 'direct'
-              ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
-              : 'text-wa-dark-subtext hover:bg-wa-dark-hover'
+              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+              : 'text-slate-400 hover:bg-slateDark-hover'
           }`}
         >
           Direct
         </button>
         <button
           onClick={() => setActiveTab('groups')}
-          className={`px-3 py-1 rounded-full transition-all ${
+          className={`px-3 py-1 rounded-xl transition-all ${
             activeTab === 'groups'
-              ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
-              : 'text-wa-dark-subtext hover:bg-wa-dark-hover'
+              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+              : 'text-slate-400 hover:bg-slateDark-hover'
           }`}
         >
           Groups
@@ -260,12 +258,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Chat List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-wa-dark-border/20 dark:divide-wa-dark-border/20">
+      <div className="flex-1 overflow-y-auto divide-y divide-slateDark-border/30 dark:divide-slateDark-border/30">
         {filteredChats.length === 0 ? (
-          <div className="p-8 text-center text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-500 text-xs space-y-2">
-            <MessageSquare className="w-10 h-10 mx-auto opacity-30 text-emerald-500" />
-            <p className="font-semibold text-sm">No conversations yet</p>
-            <p>Type any username or RoyalID above to start a live chat!</p>
+          <div className="p-8 text-center text-slate-500 text-xs space-y-2">
+            <MessageSquare className="w-10 h-10 mx-auto opacity-30 text-blue-500" />
+            <p className="font-semibold text-sm text-slate-300">No conversations yet</p>
+            <p>Search any username or Royal ID above to start chatting!</p>
           </div>
         ) : (
           filteredChats.map((chat) => {
@@ -296,8 +294,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => onSelectChat(chat.id)}
                 className={`flex items-center gap-3 p-3.5 cursor-pointer transition-colors ${
                   isActive
-                    ? 'bg-wa-dark-hover dark:bg-wa-dark-hover bg-gray-200/80 border-l-4 border-emerald-500'
-                    : 'hover:bg-wa-dark-panel dark:hover:bg-wa-dark-panel hover:bg-gray-100'
+                    ? 'bg-slateDark-hover dark:bg-slateDark-hover bg-slate-200/80 border-l-4 border-blue-500'
+                    : 'hover:bg-slateDark-surface dark:hover:bg-slateDark-surface hover:bg-slate-100'
                 }`}
               >
                 {/* Avatar */}
@@ -305,13 +303,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <img
                     src={chatAvatar}
                     alt={chatTitle}
-                    className="w-12 h-12 rounded-full object-cover bg-wa-dark-panel"
+                    className="w-12 h-12 rounded-xl object-cover bg-slate-900 border border-slateDark-border"
                   />
                   {!chat.is_group && isOtherOnline && (
-                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-wa-dark-bg rounded-full" />
+                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-slateDark-bg rounded-full" />
                   )}
                   {chat.is_group && (
-                    <span className="absolute -bottom-1 -right-1 p-0.5 bg-emerald-700 text-white rounded-full">
+                    <span className="absolute -bottom-1 -right-1 p-0.5 bg-blue-600 text-white rounded-full">
                       <Users className="w-3 h-3" />
                     </span>
                   )}
@@ -320,32 +318,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-sm truncate text-wa-dark-text dark:text-wa-dark-text text-gray-900">
+                    <h4 className="font-semibold text-sm truncate text-slateDark-text dark:text-slateDark-text text-slate-900">
                       {chatTitle}
                     </h4>
-                    <span className="text-[11px] text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-500 shrink-0 ml-2">
+                    <span className="text-[11px] text-slate-500 shrink-0 ml-2">
                       {lastTime}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-500 truncate pr-2">
+                    <p className="text-xs text-slate-400 truncate pr-2">
                       {lastMessageText}
                     </p>
 
                     {/* Unread Badge */}
                     {Boolean(chat.unread_count && chat.unread_count > 0) && (
-                      <span className="shrink-0 bg-emerald-500 text-white font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow">
+                      <span className="shrink-0 bg-blue-600 text-white font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow">
                         {chat.unread_count}
                       </span>
                     )}
                   </div>
 
-                  {/* RoyalID Tag for direct chats */}
+                  {/* 7-digit Royal ID for direct chats */}
                   {otherUser && (
-                    <div className="mt-1 flex items-center gap-1">
-                      <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1 rounded border border-amber-500/20">
-                        {otherUser.royal_id}
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 font-bold">
+                        #{otherUser.royal_id}
                       </span>
                       {isOtherOnline && (
                         <span className="text-[9px] text-emerald-400 font-medium">Online</span>
@@ -360,6 +358,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Modals */}
+      {showProfileModal && <ProfileModal onClose={() => setShowProfileModal(false)} />}
+
       {showGroupModal && (
         <CreateGroupModal
           onClose={() => setShowGroupModal(false)}

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Smile,
   Paperclip,
@@ -6,9 +6,6 @@ import {
   Send,
   Image as ImageIcon,
   FileText,
-  Film,
-  HardDrive,
-  X,
   UploadCloud
 } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder.js';
@@ -45,7 +42,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -111,7 +107,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   if (isRecordingVoice) {
     return (
-      <div className="p-3 bg-wa-dark-panel dark:bg-wa-dark-panel bg-[#f0f2f5] border-t border-wa-dark-border dark:border-wa-dark-border">
+      <div className="p-3 bg-slateDark-surface dark:bg-slateDark-surface bg-white border-t border-slateDark-border dark:border-slateDark-border">
         <VoiceRecorder
           onSendVoice={handleVoiceUpload}
           onCancel={() => setIsRecordingVoice(false)}
@@ -121,10 +117,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }
 
   return (
-    <div className="relative p-3 bg-wa-dark-panel dark:bg-wa-dark-panel bg-[#f0f2f5] border-t border-wa-dark-border dark:border-wa-dark-border select-none">
+    <div className="relative p-3 bg-slateDark-surface dark:bg-slateDark-surface bg-white border-t border-slateDark-border dark:border-slateDark-border select-none">
       {/* Uploading progress indicator */}
       {uploading && (
-        <div className="absolute -top-9 left-0 right-0 bg-emerald-600 text-white text-xs py-1.5 px-4 flex items-center justify-between font-semibold shadow-md animate-pulse">
+        <div className="absolute -top-9 left-0 right-0 bg-blue-600 text-white text-xs py-1.5 px-4 flex items-center justify-between font-semibold shadow-md animate-pulse">
           <div className="flex items-center gap-2">
             <UploadCloud className="w-4 h-4 animate-bounce" />
             <span>Streaming upload to Supabase (up to 1GB)...</span>
@@ -150,13 +146,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
       {/* Emoji Picker Popover */}
       {showEmojiPicker && (
-        <div className="absolute bottom-full left-3 mb-2 w-72 max-h-60 overflow-y-auto bg-wa-dark-panel dark:bg-wa-dark-panel bg-white border border-wa-dark-border dark:border-wa-dark-border rounded-2xl p-3 shadow-2xl z-30 grid grid-cols-8 gap-1 text-xl">
+        <div className="absolute bottom-full left-3 mb-2 w-72 max-h-60 overflow-y-auto bg-slateDark-surface dark:bg-slateDark-surface bg-white border border-slateDark-border dark:border-slateDark-border rounded-2xl p-3 shadow-2xl z-30 grid grid-cols-8 gap-1 text-xl">
           {EMOJI_LIST.map((emoji) => (
             <button
               key={emoji}
               type="button"
               onClick={() => addEmoji(emoji)}
-              className="p-1 hover:bg-wa-dark-hover rounded-lg transition-transform hover:scale-125"
+              className="p-1 hover:bg-slateDark-hover rounded-lg transition-transform hover:scale-125"
             >
               {emoji}
             </button>
@@ -166,32 +162,32 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
       {/* Attachment Popover Menu */}
       {showAttachMenu && (
-        <div className="absolute bottom-full left-12 mb-2 w-56 bg-wa-dark-panel dark:bg-wa-dark-panel bg-white border border-wa-dark-border dark:border-wa-dark-border rounded-2xl p-2 shadow-2xl z-30 space-y-1 text-xs font-semibold animate-in fade-in slide-in-from-bottom-2">
+        <div className="absolute bottom-full left-12 mb-2 w-56 bg-slateDark-surface dark:bg-slateDark-surface bg-white border border-slateDark-border dark:border-slateDark-border rounded-2xl p-2 shadow-2xl z-30 space-y-1 text-xs font-semibold animate-in fade-in slide-in-from-bottom-2">
           <button
             type="button"
             onClick={() => imageInputRef.current?.click()}
-            className="w-full flex items-center gap-3 p-2.5 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-100 rounded-xl transition-colors text-left"
+            className="w-full flex items-center gap-3 p-2.5 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-100 rounded-xl transition-colors text-left"
           >
             <div className="p-2 bg-purple-500/20 text-purple-400 rounded-lg">
               <ImageIcon className="w-4 h-4" />
             </div>
             <div>
-              <p>Photos & Videos</p>
-              <p className="text-[10px] text-gray-400 font-normal">HD images, clips</p>
+              <p className="text-slateDark-text dark:text-slateDark-text text-slate-900">Photos & Videos</p>
+              <p className="text-[10px] text-slate-400 font-normal">HD images, 4K clips</p>
             </div>
           </button>
 
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full flex items-center gap-3 p-2.5 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-100 rounded-xl transition-colors text-left"
+            className="w-full flex items-center gap-3 p-2.5 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-100 rounded-xl transition-colors text-left"
           >
-            <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+            <div className="p-2 bg-blue-500/20 text-blue-400 rounded-lg">
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <p>Document & Files</p>
-              <p className="text-[10px] text-gray-400 font-normal">Up to 1GB per file</p>
+              <p className="text-slateDark-text dark:text-slateDark-text text-slate-900">Document & Files</p>
+              <p className="text-[10px] text-slate-400 font-normal">Up to 1GB per file</p>
             </div>
           </button>
         </div>
@@ -206,10 +202,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             setShowEmojiPicker(!showEmojiPicker);
             setShowAttachMenu(false);
           }}
-          className="p-2 text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-500 hover:text-wa-dark-text rounded-full hover:bg-wa-dark-hover transition-colors"
+          className="p-2 text-slate-400 hover:text-blue-400 rounded-xl hover:bg-slateDark-hover transition-colors"
           title="Emojis"
         >
-          <Smile className="w-6 h-6" />
+          <Smile className="w-5 h-5" />
         </button>
 
         {/* Attach Button */}
@@ -219,10 +215,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             setShowAttachMenu(!showAttachMenu);
             setShowEmojiPicker(false);
           }}
-          className="p-2 text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-500 hover:text-wa-dark-text rounded-full hover:bg-wa-dark-hover transition-colors"
+          className="p-2 text-slate-400 hover:text-blue-400 rounded-xl hover:bg-slateDark-hover transition-colors"
           title="Attach media or files (Up to 1GB)"
         >
-          <Paperclip className="w-6 h-6" />
+          <Paperclip className="w-5 h-5" />
         </button>
 
         {/* Text Input */}
@@ -231,8 +227,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             type="text"
             value={text}
             onChange={handleTextChange}
-            placeholder="Type a message or share files..."
-            className="w-full py-2.5 px-4 bg-wa-dark-bg dark:bg-wa-dark-bg bg-white border border-wa-dark-border dark:border-wa-dark-border rounded-xl text-sm text-wa-dark-text dark:text-wa-dark-text text-gray-900 placeholder:text-wa-dark-subtext focus:outline-none focus:border-emerald-500 transition-colors"
+            placeholder="Type a message or drop files..."
+            className="w-full py-2.5 px-4 bg-slateDark-bg dark:bg-slateDark-bg bg-slate-100 border border-slateDark-border/60 dark:border-slateDark-border/60 rounded-xl text-sm text-slateDark-text dark:text-slateDark-text text-slate-900 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
           />
         </div>
 
@@ -240,19 +236,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {text.trim() ? (
           <button
             type="submit"
-            className="p-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-full transition-all shadow-md shrink-0"
+            className="p-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white rounded-xl transition-all shadow-md shadow-blue-500/25 shrink-0"
             title="Send Message"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </button>
         ) : (
           <button
             type="button"
             onClick={() => setIsRecordingVoice(true)}
-            className="p-2.5 text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-500 hover:text-emerald-400 hover:bg-wa-dark-hover rounded-full transition-colors shrink-0"
+            className="p-2.5 text-slate-400 hover:text-blue-400 hover:bg-slateDark-hover rounded-xl transition-colors shrink-0"
             title="Record Voice Note"
           >
-            <Mic className="w-6 h-6" />
+            <Mic className="w-5 h-5" />
           </button>
         )}
       </form>

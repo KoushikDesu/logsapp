@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.js';
-import { Crown, Sparkles, Shield, User, Lock, Mail, Terminal, ArrowRight, RefreshCw } from 'lucide-react';
+import { BrandLogo } from '../Common/BrandLogo.js';
+import { User, Lock, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Terminal, Sparkles } from 'lucide-react';
 
 export const AuthModal: React.FC = () => {
   const { login, register } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
-  const [identifier, setIdentifier] = useState('');
-  const [username, setUsername] = useState('');
+  
+  // Login fields
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Register fields (Exact fields requested)
   const [displayName, setDisplayName] = useState('');
-  const [royalId, setRoyalId] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const generateRandomRoyalId = () => {
-    const num = Math.floor(1000 + Math.random() * 9000);
-    const alpha = Math.random().toString(36).substring(2, 5).toUpperCase();
-    setRoyalId(`ROYAL-${num}${alpha}`);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,25 +27,47 @@ export const AuthModal: React.FC = () => {
 
     try {
       if (isRegister) {
-        if (!username || !password || !displayName) {
-          setError('Please fill in username, display name, and password');
+        if (!displayName.trim()) {
+          setError('Please enter your Display Name');
           setLoading(false);
           return;
         }
+        if (!username.trim()) {
+          setError('Please choose a Username');
+          setLoading(false);
+          return;
+        }
+        if (!password) {
+          setError('Please enter a Password');
+          setLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('Passwords do not match. Please re-enter your password.');
+          setLoading(false);
+          return;
+        }
+        if (password.length < 6) {
+          setError('Password must be at least 6 characters long');
+          setLoading(false);
+          return;
+        }
+
+        // Clean username: remove leading @ if typed
+        const cleanUsername = username.trim().toLowerCase().replace(/^@+/, '');
+
         await register({
-          username,
-          password,
-          display_name: displayName,
-          royal_id: royalId || undefined,
-          email: email || undefined,
+          display_name: displayName.trim(),
+          username: cleanUsername,
+          password: password,
         });
       } else {
-        if (!identifier || !password) {
-          setError('Please enter your username/RoyalID and password');
+        if (!loginIdentifier || !loginPassword) {
+          setError('Please enter your username / Royal ID and password');
           setLoading(false);
           return;
         }
-        await login(identifier, password);
+        await login(loginIdentifier.trim(), loginPassword);
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Authentication failed. Please try again.');
@@ -55,31 +77,34 @@ export const AuthModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      {/* Background Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 overflow-y-auto">
+      {/* Background Ambient Glow (SmartPrep Style) */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative w-full max-w-md bg-wa-dark-panel dark:bg-wa-dark-panel bg-white text-wa-dark-text dark:text-wa-dark-text text-gray-900 rounded-2xl shadow-2xl border border-wa-dark-border/40 dark:border-wa-dark-border/40 overflow-hidden">
+      <div className="relative w-full max-w-md bg-slateDark-surface dark:bg-slateDark-surface bg-white text-slateDark-text dark:text-slateDark-text text-slate-900 rounded-3xl shadow-2xl border border-slateDark-border dark:border-slateDark-border overflow-hidden">
         {/* Header Ribbon */}
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-6 text-white text-center relative">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md mb-3 shadow-inner">
-            <Crown className="w-8 h-8 text-amber-300" />
+        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 p-6 text-white text-center relative overflow-hidden">
+          <div className="flex justify-center mb-3">
+            <BrandLogo size="lg" showText={false} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">LogsApp / RoyalChat</h1>
-          <p className="text-emerald-100 text-xs mt-1">
-            WhatsApp-like Messenger • 1GB File Sharing • Linux CLI Ready
+          <h1 className="text-2xl font-bold tracking-tight font-heading">
+            RoyalChat <span className="text-amber-400 text-xs font-mono font-normal ml-1">v2.0</span>
+          </h1>
+          <p className="text-blue-100 text-xs mt-1 max-w-xs mx-auto">
+            Real-Time Messenger • 1GB File Bridge • Linux Terminal Ready
           </p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex border-b border-wa-dark-border/20 dark:border-wa-dark-border/20">
+        <div className="flex border-b border-slateDark-border/60 dark:border-slateDark-border/60">
           <button
             type="button"
             onClick={() => { setIsRegister(false); setError(''); }}
             className={`flex-1 py-3 text-sm font-semibold text-center transition-all ${
               !isRegister
-                ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-500/5'
-                : 'text-gray-400 hover:text-gray-200'
+                ? 'text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Sign In
@@ -89,19 +114,19 @@ export const AuthModal: React.FC = () => {
             onClick={() => { setIsRegister(true); setError(''); }}
             className={`flex-1 py-3 text-sm font-semibold text-center transition-all ${
               isRegister
-                ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-500/5'
-                : 'text-gray-400 hover:text-gray-200'
+                ? 'text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Create Account & RoyalID
+            Sign Up
           </button>
         </div>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs flex items-center gap-2">
-              <Shield className="w-4 h-4 shrink-0" />
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
@@ -110,125 +135,114 @@ export const AuthModal: React.FC = () => {
             /* Login Form */
             <>
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">
-                  Username, RoyalID, or Email
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Username or 7-Digit Royal ID
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="e.g. king or ROYAL-9821"
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    placeholder="e.g. @madarauchiha or 7482910"
                     required
-                    className="w-full pl-10 pr-3 py-2.5 bg-wa-dark-bg dark:bg-wa-dark-bg bg-gray-50 border border-wa-dark-border dark:border-wa-dark-border rounded-xl text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slateDark-bg dark:bg-slateDark-bg bg-slate-50 border border-slateDark-border dark:border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full pl-10 pr-3 py-2.5 bg-wa-dark-bg dark:bg-wa-dark-bg bg-gray-50 border border-wa-dark-border dark:border-wa-dark-border rounded-xl text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slateDark-bg dark:bg-slateDark-bg bg-slate-50 border border-slateDark-border dark:border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
             </>
           ) : (
-            /* Register Form */
+            /* Register Form: Only the 4 requested fields */
             <>
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
                   Display Name
                 </label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="e.g. Alexander King"
-                  required
-                  className="w-full px-3 py-2 bg-wa-dark-bg dark:bg-wa-dark-bg bg-gray-50 border border-wa-dark-border dark:border-wa-dark-border rounded-xl text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 mb-1">
-                    Username
-                  </label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                    placeholder="alexander"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Madara Uchiha"
                     required
-                    className="w-full px-3 py-2 bg-wa-dark-bg dark:bg-wa-dark-bg bg-gray-50 border border-wa-dark-border dark:border-wa-dark-border rounded-xl text-sm focus:outline-none focus:border-emerald-500 transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-gray-400">
-                      RoyalID
-                    </label>
-                    <button
-                      type="button"
-                      onClick={generateRandomRoyalId}
-                      className="text-[10px] text-amber-400 hover:underline flex items-center gap-1"
-                    >
-                      <RefreshCw className="w-2.5 h-2.5" /> Random
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={royalId}
-                    onChange={(e) => setRoyalId(e.target.value.toUpperCase())}
-                    placeholder="ROYAL-9842"
-                    className="w-full px-3 py-2 bg-wa-dark-bg dark:bg-wa-dark-bg bg-gray-50 border border-amber-500/40 rounded-xl text-xs font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500 transition-colors"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slateDark-bg dark:bg-slateDark-bg bg-slate-50 border border-slateDark-border dark:border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">
-                  Email (Optional)
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Username
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">@</span>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="alex@royal.io"
-                    className="w-full pl-10 pr-3 py-2 bg-wa-dark-bg dark:bg-wa-dark-bg bg-gray-50 border border-wa-dark-border dark:border-wa-dark-border rounded-xl text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+                    type="text"
+                    value={username.replace(/^@+/, '')}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    placeholder="madarauchiha"
+                    required
+                    className="w-full pl-8 pr-3 py-2.5 bg-slateDark-bg dark:bg-slateDark-bg bg-slate-50 border border-slateDark-border dark:border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-100 placeholder:text-slate-500 font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full pl-10 pr-3 py-2 bg-wa-dark-bg dark:bg-wa-dark-bg bg-gray-50 border border-wa-dark-border dark:border-wa-dark-border rounded-xl text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slateDark-bg dark:bg-slateDark-bg bg-slate-50 border border-slateDark-border dark:border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Re-enter Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="w-full pl-10 pr-3 py-2.5 bg-slateDark-bg dark:bg-slateDark-bg bg-slate-50 border border-slateDark-border dark:border-slateDark-border rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-slate-100 placeholder:text-slate-500"
+                  />
+                </div>
+              </div>
+
+              {/* Informative RoyalID badge note */}
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>A unique <b>7-digit Royal ID</b> (e.g. <code>#7482910</code>) will be generated automatically for your account.</span>
               </div>
             </>
           )}
@@ -236,13 +250,13 @@ export const AuthModal: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 mt-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-semibold rounded-xl text-sm shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            className="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white font-semibold rounded-xl text-sm shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
           >
             {loading ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <span>{isRegister ? 'Create Royal Account' : 'Enter LogsApp'}</span>
+                <span>{isRegister ? 'Complete Sign Up' : 'Sign In to RoyalChat'}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -250,10 +264,10 @@ export const AuthModal: React.FC = () => {
         </form>
 
         {/* Footer CLI Info */}
-        <div className="p-3 bg-wa-dark-bg/60 dark:bg-wa-dark-bg/60 border-t border-wa-dark-border/20 text-center">
-          <p className="text-[11px] text-gray-400 flex items-center justify-center gap-1.5">
-            <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Accessible via Linux Terminal using <code className="text-emerald-400 font-mono font-bold">logsapp</code> CLI</span>
+        <div className="p-3.5 bg-slateDark-bg/80 dark:bg-slateDark-bg/80 bg-slate-100 border-t border-slateDark-border/40 text-center">
+          <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5 font-mono">
+            <Terminal className="w-3.5 h-3.5 text-blue-400" />
+            <span>Linux CLI: <code className="text-blue-400 font-bold">logsapp login</code></span>
           </p>
         </div>
       </div>

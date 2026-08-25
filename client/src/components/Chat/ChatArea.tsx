@@ -6,17 +6,16 @@ import {
   Terminal,
   MoreVertical,
   Shield,
-  Crown,
-  Phone,
-  Video,
-  Search,
-  MessageSquare
+  Sparkles,
+  MessageSquare,
+  Crown
 } from 'lucide-react';
 import { Chat, Message } from '../../types/index.js';
 import { useAuth } from '../../context/AuthContext.js';
 import { useSocket } from '../../context/SocketContext.js';
 import { useTheme } from '../../context/ThemeContext.js';
 import api from '../../services/api.js';
+import { BrandLogo } from '../Common/BrandLogo.js';
 import { MessageBubble } from './MessageBubble.js';
 import { ChatInput } from './ChatInput.js';
 import { MediaLightbox } from './MediaLightbox.js';
@@ -39,7 +38,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chat, onBack, onRefreshChat 
   const [selectedMedia, setSelectedMedia] = useState<Message | null>(null);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showCLIModal, setShowCLIModal] = useState(false);
-  const [showMembersDrawer, setShowMembersDrawer] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -118,18 +116,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chat, onBack, onRefreshChat 
 
   if (!chat) {
     return (
-      <div className={`hidden md:flex flex-1 flex-col items-center justify-center p-8 select-none ${isDark ? 'wa-chat-bg-dark text-wa-dark-subtext' : 'wa-chat-bg-light text-gray-500'}`}>
-        <div className="max-w-md text-center space-y-4">
-          <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-3xl flex items-center justify-center mx-auto ring-8 ring-emerald-500/5">
-            <Crown className="w-10 h-10" />
+      <div className={`hidden md:flex flex-1 flex-col items-center justify-center p-8 select-none ${isDark ? 'chat-bg-dark text-slate-400' : 'chat-bg-light text-slate-500'}`}>
+        <div className="max-w-md text-center space-y-5">
+          <div className="flex justify-center">
+            <BrandLogo size="xl" showText={false} />
           </div>
-          <h2 className="text-2xl font-bold text-wa-dark-text dark:text-wa-dark-text text-gray-800">
-            LogsApp / RoyalChat Web
-          </h2>
-          <p className="text-sm leading-relaxed">
-            Send and receive messages without keeping your phone online. Share files, images, and videos up to <b>1GB</b> with instant Linux CLI companion access.
-          </p>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-mono">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold font-heading text-slateDark-text dark:text-slateDark-text text-slate-900">
+              RoyalChat Messenger
+            </h2>
+            <p className="text-sm leading-relaxed text-slate-400">
+              Send encrypted messages, voice notes, and share large files up to <b className="text-blue-400">1GB</b> with seamless Linux terminal access.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full text-xs font-mono">
             <Terminal className="w-3.5 h-3.5" />
             <span>CLI Access: logsapp chats</span>
           </div>
@@ -217,50 +217,47 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chat, onBack, onRefreshChat 
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-wa-dark-bg dark:bg-wa-dark-bg bg-white relative overflow-hidden">
+    <div className="flex-1 h-full flex flex-col bg-slateDark-bg dark:bg-slateDark-bg bg-slate-50 relative overflow-hidden">
       {/* Top Chat Header */}
-      <div className="h-16 px-4 flex items-center justify-between bg-wa-dark-panel dark:bg-wa-dark-panel bg-[#f0f2f5] border-b border-wa-dark-border dark:border-wa-dark-border z-10 select-none">
+      <div className="h-16 px-4 flex items-center justify-between bg-slateDark-surface dark:bg-slateDark-surface bg-white border-b border-slateDark-border dark:border-slateDark-border z-10 select-none">
         <div className="flex items-center gap-3 min-w-0">
           {/* Back button for mobile */}
           <button
             onClick={onBack}
-            className="md:hidden p-1 text-wa-dark-subtext hover:text-wa-dark-text rounded-full"
+            className="md:hidden p-1.5 text-slate-400 hover:text-slate-200 rounded-xl"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
 
           {/* Avatar */}
-          <div
-            onClick={() => chat.is_group && setShowMembersDrawer(true)}
-            className={`relative shrink-0 ${chat.is_group ? 'cursor-pointer' : ''}`}
-          >
+          <div className="relative shrink-0">
             <img
               src={chatAvatar}
               alt={chatTitle}
-              className="w-10 h-10 rounded-full object-cover bg-wa-dark-bg"
+              className="w-10 h-10 rounded-xl object-cover bg-slate-900 border border-slateDark-border"
             />
             {!chat.is_group && isOtherOnline && (
-              <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-wa-dark-panel rounded-full" />
+              <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slateDark-surface rounded-full" />
             )}
           </div>
 
           {/* Title & Status */}
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm truncate text-wa-dark-text dark:text-wa-dark-text text-gray-900">
+              <h3 className="font-semibold text-sm truncate text-slateDark-text dark:text-slateDark-text text-slate-900">
                 {chatTitle}
               </h3>
               {!chat.is_group && otherUser?.royal_id && (
                 <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-                  {otherUser.royal_id}
+                  #{otherUser.royal_id}
                 </span>
               )}
             </div>
 
             {/* Status / Typing Subtitle */}
-            <p className="text-xs text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-500 truncate">
+            <p className="text-xs text-slate-400 truncate">
               {activeTypers.length > 0 ? (
-                <span className="text-emerald-400 font-medium animate-pulse">
+                <span className="text-blue-400 font-medium animate-pulse">
                   {activeTypers.map((u) => u.display_name).join(', ')} typing...
                 </span>
               ) : chat.is_group ? (
@@ -275,47 +272,40 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ chat, onBack, onRefreshChat 
         </div>
 
         {/* Top Right Action Icons */}
-        <div className="flex items-center gap-1 text-wa-dark-subtext dark:text-wa-dark-subtext text-gray-600">
+        <div className="flex items-center gap-1.5 text-slate-400">
           {/* Storage threshold button */}
           <button
             onClick={() => setShowStorageModal(true)}
-            className="p-2 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-200 rounded-full text-amber-400 transition-colors"
+            className="p-2 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-100 rounded-xl text-amber-400 transition-colors"
             title="Chat Storage Quota & Auto-Purge"
           >
-            <HardDrive className="w-5 h-5" />
+            <HardDrive className="w-4 h-4" />
           </button>
 
           {/* CLI code modal trigger */}
           <button
             onClick={() => setShowCLIModal(true)}
-            className="p-2 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-200 rounded-full text-emerald-400 transition-colors"
+            className="p-2 hover:bg-slateDark-hover dark:hover:bg-slateDark-hover hover:bg-slate-100 rounded-xl text-blue-400 transition-colors"
             title="CLI Quick Fetch"
           >
-            <Terminal className="w-5 h-5" />
+            <Terminal className="w-4 h-4" />
           </button>
-
-          {chat.is_group && (
-            <button
-              onClick={() => setShowMembersDrawer(true)}
-              className="p-2 hover:bg-wa-dark-hover dark:hover:bg-wa-dark-hover hover:bg-gray-200 rounded-full transition-colors"
-              title="Group Members"
-            >
-              <Users className="w-5 h-5" />
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Messages Stream with WhatsApp Doodle Pattern */}
-      <div className={`flex-1 overflow-y-auto p-4 md:p-6 space-y-1 ${isDark ? 'wa-chat-bg-dark' : 'wa-chat-bg-light'}`}>
+      {/* Messages Stream with SmartPrep Ambient Pattern */}
+      <div className={`flex-1 overflow-y-auto p-4 md:p-6 space-y-1 ${isDark ? 'chat-bg-dark' : 'chat-bg-light'}`}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center text-xs opacity-60 space-y-2">
-            <MessageSquare className="w-8 h-8 text-emerald-500" />
-            <p>No messages yet. Send a greeting or drop a file up to 1GB!</p>
+          <div className="flex flex-col items-center justify-center h-full text-center text-xs text-slate-400 space-y-3">
+            <div className="p-3 bg-blue-500/10 rounded-2xl text-blue-400">
+              <MessageSquare className="w-8 h-8" />
+            </div>
+            <p className="font-semibold text-slate-300">No messages yet</p>
+            <p>Send a message or upload any file up to 1GB!</p>
           </div>
         ) : (
           messages.map((msg) => (
