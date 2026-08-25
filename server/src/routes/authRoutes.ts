@@ -186,34 +186,35 @@ router.put('/me', authenticateToken, async (req: AuthRequest, res: Response): Pr
 // Live Typeahead Search Users (Search by username, royal_id, or display_name as you type)
 router.get('/search', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const q = (req.query.q as string || '').trim();
+    const rawQ = (req.query.q as string || '').trim();
+    const cleanQ = rawQ.replace(/^[@#]+/, '').trim();
     const currentUserId = req.user?.id;
 
-    if (!q || q.length === 0) {
+    if (!cleanQ || cleanQ.length === 0) {
       res.json({ users: [] });
       return;
     }
 
-    const searchPattern = `%${q}%`;
+    const searchPattern = `%${cleanQ}%`;
     const searchRes = await query(
       `SELECT id, username, royal_id, display_name, avatar_url, bio, is_online, last_seen
        FROM users 
        WHERE id != $1 AND (
          LOWER(username) LIKE LOWER($2) OR 
-         UPPER(royal_id) LIKE UPPER($2) OR 
+         royal_id LIKE $2 OR 
          LOWER(display_name) LIKE LOWER($2)
        )
        ORDER BY 
          CASE 
            WHEN LOWER(username) = LOWER($3) THEN 1
-           WHEN UPPER(royal_id) = UPPER($3) THEN 2
+           WHEN royal_id = $3 THEN 2
            WHEN LOWER(username) LIKE LOWER($4) THEN 3
-           WHEN UPPER(royal_id) LIKE UPPER($4) THEN 4
+           WHEN royal_id LIKE $4 THEN 4
            ELSE 5 
          END,
          username ASC
        LIMIT 20`,
-      [currentUserId, searchPattern, q, `${q}%`]
+      [currentUserId, searchPattern, cleanQ, `${cleanQ}%`]
     );
 
     res.json({ users: searchRes.rows });
