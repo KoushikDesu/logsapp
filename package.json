@@ -1,23 +1,16 @@
 {
   "name": "logsapp",
+  "private": true,
   "version": "1.0.0",
-  "description": "LogsApp / RoyalChat - Real-Time Messenger with 1GB File Bridge, Supabase PostgreSQL, Auto-Purge Storage, and Linux CLI Companion",
   "type": "module",
-  "workspaces": [
-    "client",
-    "server"
-  ],
   "scripts": {
-    "dev:server": "npm run dev --prefix server",
-    "dev:client": "npm run dev --prefix client",
-    "build": "cd server && npm install && npm run build && cd ../client && npm install && npm run build",
-    "build:client": "cd client && npm install && npm run build",
-    "build:server": "cd server && npm install && npm run build",
-    "vercel-build": "cd server && npm install && npm run build && cd ../client && npm install && npm run build",
-    "start": "node server/dist/index.js",
-    "migrate": "python server/src/db/migrate.py"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server/dist/index.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.48.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -30,21 +23,6 @@
     "uuid": "^11.0.3"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
     "vite": "^6.0.1"
-  },
-  "keywords": [
-    "chat",
-    "royalchat",
-    "logsapp",
-    "supabase",
-    "postgresql",
-    "cli",
-    "linux",
-    "real-time",
-    "file-sharing",
-    "websockets"
-  ],
-  "author": "Koushik Desu",
-  "license": "MIT"
+  }
 }
