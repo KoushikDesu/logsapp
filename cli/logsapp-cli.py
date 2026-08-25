@@ -434,17 +434,117 @@ def cmd_download(args):
     except Exception as e:
         print(f"{Colors.RED}[ERROR] Download failed: {e}{Colors.RESET}")
 
+def cmd_pull(args):
+    """Download all files from a chat into local destination directory (College Lab friendly)"""
+    session = load_session()
+    token = session.get("token")
+    if not token:
+        print(f"{Colors.YELLOW}Please login first.{Colors.RESET}")
+        return
+
+    target = args.target.lstrip('@')
+    dest_dir = Path(args.output or ".").resolve()
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    res_history = make_request(f"/api/cli/history/{parse.quote(target)}?limit=1", token=token)
+    if not res_history or not res_history.get("chat_id"):
+        print(f"{Colors.RED}[ERROR] Could not resolve chat for '{target}'.{Colors.RESET}")
+        return
+    chat_id = res_history["chat_id"]
+
+    res = make_request(f"/api/files/chat/{chat_id}", token=token)
+    if not res or "files" not in res:
+        print("No files found.")
+        return
+
+    files = res["files"]
+    print(f"\n{Colors.CYAN}{Colors.BOLD}>> Importing {len(files)} files to {dest_dir}...{Colors.RESET}")
+
+    for idx, f in enumerate(files, 1):
+        file_id = f.get("id")
+        file_name = f.get("file_name") or f"file_{file_id}"
+        target_path = dest_dir / file_name
+        print(f"[{idx}/{len(files)}] Fetching {file_name}...")
+        
+        args_dl = argparse.Namespace(code=file_id, output=str(target_path))
+        cmd_download(args_dl)
+
+    print(f"\n{Colors.GREEN}{Colors.BOLD}[OK] All files imported to {dest_dir}!{Colors.RESET}")
+
+def cmd_export(args):
+    """Export all chat history & code blocks into a readable text file"""
+    session = load_session()
+    token = session.get("token")
+    if not token:
+        print(f"{Colors.YELLOW}Please login first.{Colors.RESET}")
+        return
+
+    target = args.target.lstrip('@')
+    limit = args.limit or 100
+    out_file = args.output or f"chat_export_{target}_{int(time.time())}.txt"
+
+    res = make_request(f"/api/cli/history/{parse.quote(target)}?limit={limit}", token=token)
+    if not res or not res.get("success"):
+        return
+
+    messages = res.get("messages", [])
+    with open(out_file, "w", encoding="utf-8") as f:
+        f.write(f"=== LogsApp Chat History Export: {target} ===\n")
+        f.write(f"Generated at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        for m in messages:
+            f.write(f"[{m['created_at']}] {m['sender']} (#{m['royal_id']}):\n")
+            if m.get('file_name'):
+                f.write(f"  [ATTACHMENT] {m['file_name']} (QuickCode: {m.get('quick_code')})\n")
+            if m.get('content'):
+                f.write(f"  {m['content']}\n")
+            f.write("\n")
+
+    print(f"{Colors.GREEN}{Colors.BOLD}[OK] Chat logs exported to: {os.path.abspath(out_file)}{Colors.RESET}")
+
+def cmd_push_dir(args):
+    """Zip a folder and upload to chat up to 1GB"""
+    import zipfile
+    import shutil
+    import tempfile
+
+    folder_path = Path(args.folder).resolve()
+    if not folder_path.exists() or not folder_path.is_dir():
+        print(f"{Colors.RED}[ERROR] Directory not found: {folder_path}{Colors.RESET}")
+        return
+
+    zip_name = f"{folder_path.name}_{int(time.time())}.zip"
+    tmp_zip = Path(tempfile.gettempdir()) / zip_name
+
+    print(f">> Compressing {folder_path.name} into {zip_name}...")
+    with zipfile.ZipFile(tmp_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                abs_f = Path(root) / file
+                rel_f = abs_f.relative_to(folder_path)
+                zipf.write(abs_f, rel_f)
+
+    print(f">> Compressed ({tmp_zip.stat().st_size / (1024*1024):.2f} MB). Uploading to chat...")
+    args_up = argparse.Namespace(target=args.target, file=str(tmp_zip), caption=f"Project Folder: {folder_path.name}")
+    cmd_upload(args_up)
+
+    try:
+        tmp_zip.unlink()
+    except Exception:
+        pass
+
 def main():
     parser = argparse.ArgumentParser(description="LogsApp / RoyalChat - Linux Terminal Client")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # login
     p_login = subparsers.add_parser("login", help="Login to LogsApp")
-    p_login.add_argument("--identifier", "-u", help="Username or RoyalID")
+    p_login.add_argument("--identifier", "-u", help="Username or 7-Digit RoyalID")
     p_login.add_argument("--password", "-p", help="Password")
     p_login.add_argument("--server", "-s", help="Server URL")
+    
     # whoami
-    subparsers.add_parser("whoami", help="Show current user info and storage limit")
+    subparsers.add_parser("whoami", help="Show current user info, 7-digit Royal ID, and storage quota")
+    
     # chats
     subparsers.add_parser("chats", help="List active conversations")
     
@@ -464,12 +564,28 @@ def main():
     p_up.add_argument("file", help="Local file path to upload")
     p_up.add_argument("--caption", help="Optional file caption")
 
+    # push-dir (Zip and upload folder)
+    p_pdir = subparsers.add_parser("push-dir", help="Zip and upload an entire folder (up to 1GB)")
+    p_pdir.add_argument("folder", help="Folder path to compress and send")
+    p_pdir.add_argument("target", help="Chat ID or @username")
+
+    # pull / import (Download all files from a chat)
+    p_pull = subparsers.add_parser("pull", help="Download all shared files in a chat into local folder")
+    p_pull.add_argument("target", help="Chat ID or @username")
+    p_pull.add_argument("output", nargs="?", default=".", help="Destination folder (default: current directory)")
+
+    # export (Export chat log to text file)
+    p_exp = subparsers.add_parser("export", help="Export chat messages and code logs to a text file")
+    p_exp.add_argument("target", help="Chat ID or @username")
+    p_exp.add_argument("output", nargs="?", help="Output text filename")
+    p_exp.add_argument("--limit", type=int, default=100, help="Message count limit")
+
     # files
     p_files = subparsers.add_parser("files", help="List shared files in chat")
     p_files.add_argument("target", nargs="?", help="Chat ID or @username")
 
     # get / download
-    p_get = subparsers.add_parser("get", help="Download a file using QuickCode or File ID")
+    p_get = subparsers.add_parser("get", help="Download a file using 6-digit QuickCode or File ID")
     p_get.add_argument("code", help="6-digit QuickCode (e.g. LGS-8492) or File ID")
     p_get.add_argument("output", nargs="?", help="Output file path destination")
 
@@ -487,6 +603,12 @@ def main():
         cmd_send(args)
     elif args.command == "upload":
         cmd_upload(args)
+    elif args.command == "push-dir":
+        cmd_push_dir(args)
+    elif args.command == "pull":
+        cmd_pull(args)
+    elif args.command == "export":
+        cmd_export(args)
     elif args.command == "files":
         cmd_files(args)
     elif args.command == "get":

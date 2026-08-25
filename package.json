@@ -1,17 +1,19 @@
 {
   "name": "logsapp",
   "version": "1.0.0",
-  "description": "LogsApp / RoyalChat - WhatsApp-Style Real-time Web Chat with 1GB File Sharing, Supabase PostgreSQL, Auto-Purge Storage, and Standalone Linux CLI Companion",
+  "description": "LogsApp / RoyalChat - Real-Time Messenger with 1GB File Bridge, Supabase PostgreSQL, Auto-Purge Storage, and Linux CLI Companion",
   "scripts": {
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "build": "npm install --prefix client && npm run build --prefix client && npm install --prefix server && npm run build --prefix server",
+    "build:client": "npm install --prefix client && npm run build --prefix client",
+    "build:server": "npm install --prefix server && npm run build --prefix server",
+    "vercel-build": "npm install --prefix client && npm run build --prefix client",
     "start": "node server/dist/index.js",
     "migrate": "python server/src/db/migrate.py"
   },
   "keywords": [
     "chat",
-    "whatsapp",
     "royalchat",
     "logsapp",
     "supabase",
