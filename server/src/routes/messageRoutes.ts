@@ -10,8 +10,8 @@ router.get('/:chatId', authenticateToken, async (req: AuthRequest, res: Response
   try {
     const chatId = req.params.chatId as string;
     const userId = req.user?.id;
-    const limit = parseInt(req.query.limit as string) || 50;
-    const before = req.query.before as string; // timestamp or id
+    const limit = parseInt(req.query.limit as string) || 60;
+    const before = req.query.before as string;
 
     // Check membership
     const memberCheck = await query(
@@ -23,6 +23,13 @@ router.get('/:chatId', authenticateToken, async (req: AuthRequest, res: Response
       res.status(403).json({ error: 'Not a member of this chat' });
       return;
     }
+
+    // Check if user cleared this chat
+    const clearCheck = await query(
+      'SELECT cleared_at FROM cleared_chats WHERE user_id = $1 AND chat_id = $2',
+      [userId, chatId]
+    );
+    const clearedAt = clearCheck.rows[0]?.cleared_at || null;
 
     let sql = `
       SELECT 
@@ -38,6 +45,8 @@ router.get('/:chatId', authenticateToken, async (req: AuthRequest, res: Response
         m.file_mime_type,
         m.quick_code,
         m.is_purged,
+        m.is_deleted,
+        m.forwarded_from_id,
         m.created_at,
         u.username as sender_username,
         u.display_name as sender_display_name,
@@ -60,9 +69,14 @@ router.get('/:chatId', authenticateToken, async (req: AuthRequest, res: Response
 
     const params: any[] = [chatId];
 
+    if (clearedAt) {
+      params.push(clearedAt);
+      sql += ` AND m.created_at > $${params.length}`;
+    }
+
     if (before) {
       params.push(before);
-      sql += ` AND m.created_at < $2`;
+      sql += ` AND m.created_at < $${params.length}`;
     }
 
     sql += ` ORDER BY m.created_at DESC LIMIT $${params.length + 1}`;
@@ -70,13 +84,13 @@ router.get('/:chatId', authenticateToken, async (req: AuthRequest, res: Response
 
     const msgsRes = await query(sql, params);
 
-    // Update last_read_at for participant
+    // Update last_read_at
     await query(
       'UPDATE chat_participants SET last_read_at = NOW() WHERE chat_id = $1 AND user_id = $2',
       [chatId, userId]
     );
 
-    // Reverse to return in chronological order
+    // Return in chronological order
     const messages = msgsRes.rows.reverse();
 
     res.json({ messages });
@@ -86,7 +100,7 @@ router.get('/:chatId', authenticateToken, async (req: AuthRequest, res: Response
   }
 });
 
-// Send Text Message
+// Send Text Message (with Block Check)
 router.post('/:chatId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const chatId = req.params.chatId as string;
@@ -109,6 +123,28 @@ router.post('/:chatId', authenticateToken, async (req: AuthRequest, res: Respons
       return;
     }
 
+    // Check if other participant in 1-on-1 chat has blocked sender or sender is blocked
+    const chatInfo = await query('SELECT is_group FROM chats WHERE id = $1', [chatId]);
+    if (!chatInfo.rows[0]?.is_group) {
+      const otherPart = await query(
+        'SELECT user_id FROM chat_participants WHERE chat_id = $1 AND user_id != $2',
+        [chatId, userId]
+      );
+      if (otherPart.rows.length > 0) {
+        const otherId = otherPart.rows[0].user_id;
+        const blockCheck = await query(`
+          SELECT id FROM user_blocks 
+          WHERE (blocker_id = $1 AND blocked_id = $2)
+             OR (blocker_id = $2 AND blocked_id = $1)
+        `, [otherId, userId]);
+
+        if (blockCheck.rows.length > 0) {
+          res.status(403).json({ error: 'Cannot send message: conversation is blocked' });
+          return;
+        }
+      }
+    }
+
     const insertRes = await query(
       `INSERT INTO messages (chat_id, sender_id, content, message_type)
        VALUES ($1, $2, $3, 'text')
@@ -124,7 +160,6 @@ router.post('/:chatId', authenticateToken, async (req: AuthRequest, res: Respons
     // Check storage limits
     checkAndPurgeChatStorage(chatId).catch(console.error);
 
-    // Fetch sender info for response
     const senderRes = await query('SELECT username, display_name, royal_id, avatar_url FROM users WHERE id = $1', [userId]);
     const sender = senderRes.rows[0];
 
@@ -144,42 +179,85 @@ router.post('/:chatId', authenticateToken, async (req: AuthRequest, res: Respons
   }
 });
 
-// Toggle Reaction on Message
-router.post('/reactions/:messageId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+// Forward Message
+router.post('/:messageId/forward', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const messageId = req.params.messageId as string;
     const userId = req.user?.id;
-    const { emoji } = req.body;
+    const { targetChatIds } = req.body; // Array of chat IDs
 
-    if (!emoji) {
-      res.status(400).json({ error: 'Emoji is required' });
+    if (!Array.isArray(targetChatIds) || targetChatIds.length === 0) {
+      res.status(400).json({ error: 'targetChatIds array is required' });
       return;
     }
 
-    // Check existing
-    const existing = await query(
-      'SELECT id FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3',
-      [messageId, userId, emoji]
-    );
-
-    if (existing.rows.length > 0) {
-      // Remove reaction (toggle)
-      await query('DELETE FROM message_reactions WHERE id = $1', [existing.rows[0].id]);
-      res.json({ action: 'removed', emoji });
-    } else {
-      // Add reaction
-      await query(
-        'INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1, $2, $3)',
-        [messageId, userId, emoji]
-      );
-      res.json({ action: 'added', emoji });
+    const originalMsgRes = await query('SELECT * FROM messages WHERE id = $1', [messageId]);
+    if (originalMsgRes.rows.length === 0) {
+      res.status(404).json({ error: 'Original message not found' });
+      return;
     }
+
+    const orig = originalMsgRes.rows[0];
+    const forwardedMessages = [];
+
+    for (const targetChatId of targetChatIds) {
+      const memberCheck = await query(
+        'SELECT id FROM chat_participants WHERE chat_id = $1 AND user_id = $2',
+        [targetChatId, userId]
+      );
+      if (memberCheck.rows.length === 0) continue;
+
+      const fwdRes = await query(`
+        INSERT INTO messages (
+          chat_id, sender_id, content, message_type,
+          file_id, file_name, file_path, file_size_bytes, file_mime_type, quick_code,
+          forwarded_from_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *
+      `, [
+        targetChatId,
+        userId,
+        orig.content,
+        orig.message_type,
+        orig.file_id,
+        orig.file_name,
+        orig.file_path,
+        orig.file_size_bytes,
+        orig.file_mime_type,
+        orig.quick_code,
+        orig.sender_id
+      ]);
+
+      await query('UPDATE chats SET updated_at = NOW() WHERE id = $1', [targetChatId]);
+      forwardedMessages.push(fwdRes.rows[0]);
+    }
+
+    res.json({ message: 'Message forwarded successfully', forwardedCount: forwardedMessages.length });
   } catch (error: any) {
-    res.status(500).json({ error: 'Failed to update reaction' });
+    res.status(500).json({ error: 'Failed to forward message' });
   }
 });
 
-// Delete Message
+// Clear Chat History for Current User
+router.post('/clear/:chatId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const chatId = req.params.chatId as string;
+    const userId = req.user?.id;
+
+    await query(`
+      INSERT INTO cleared_chats (user_id, chat_id, cleared_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (user_id, chat_id)
+      DO UPDATE SET cleared_at = NOW()
+    `, [userId, chatId]);
+
+    res.json({ message: 'Chat cleared successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to clear chat' });
+  }
+});
+
+// Delete Message for Everyone
 router.delete('/:messageId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const messageId = req.params.messageId as string;
@@ -192,21 +270,60 @@ router.delete('/:messageId', authenticateToken, async (req: AuthRequest, res: Re
     }
 
     if (msgRes.rows[0].sender_id !== userId) {
-      // Check if group admin
       const adminCheck = await query(
         "SELECT role FROM chat_participants WHERE chat_id = $1 AND user_id = $2 AND role = 'admin'",
         [msgRes.rows[0].chat_id, userId]
       );
-      if (adminCheck.rows.length === 0) {
+      if (adminCheck.rows.length === 0 && req.user?.role !== 'admin') {
         res.status(403).json({ error: 'Unauthorized to delete this message' });
         return;
       }
     }
 
-    await query("UPDATE messages SET content = '[This message was deleted]', is_purged = TRUE WHERE id = $1", [messageId]);
-    res.json({ message: 'Message deleted' });
+    await query(`
+      UPDATE messages 
+      SET content = '🚫 This message was deleted', 
+          is_deleted = TRUE,
+          file_name = NULL,
+          file_path = NULL 
+      WHERE id = $1
+    `, [messageId]);
+
+    res.json({ message: 'Message deleted successfully' });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to delete message' });
+  }
+});
+
+// Reactions
+router.post('/reactions/:messageId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const messageId = req.params.messageId as string;
+    const userId = req.user?.id;
+    const { emoji } = req.body;
+
+    if (!emoji) {
+      res.status(400).json({ error: 'Emoji is required' });
+      return;
+    }
+
+    const existing = await query(
+      'SELECT id FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3',
+      [messageId, userId, emoji]
+    );
+
+    if (existing.rows.length > 0) {
+      await query('DELETE FROM message_reactions WHERE id = $1', [existing.rows[0].id]);
+      res.json({ action: 'removed', emoji });
+    } else {
+      await query(
+        'INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1, $2, $3)',
+        [messageId, userId, emoji]
+      );
+      res.json({ action: 'added', emoji });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to update reaction' });
   }
 });
 

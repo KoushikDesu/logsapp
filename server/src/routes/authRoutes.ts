@@ -7,29 +7,33 @@ import { authenticateToken, AuthRequest } from '../middleware/authMiddleware.js'
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'logsapp_royal_secret_jwt_key_2026_super_secure_token';
 
-// Helper to generate unique 7-digit numeric RoyalID
+// Generate 7-digit numerical Royal ID
 function generateRoyalId(): string {
-  // Pure 7-digit numerical ID (e.g. 7482910)
-  const num = Math.floor(1000000 + Math.random() * 9000000);
-  return String(num);
+  const min = 1000000;
+  const max = 9999999;
+  return String(Math.floor(Math.random() * (max - min + 1)) + min);
 }
 
 // Register
 router.post('/register', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    let { username, password, display_name, email, avatar_url } = req.body;
+    const { username, display_name, password, email, avatar_url } = req.body;
 
-    if (!username || !password || !display_name) {
-      res.status(400).json({ error: 'Display Name, Username, and Password are required' });
+    if (!username || !display_name || !password) {
+      res.status(400).json({ error: 'Username, display name, and password are required' });
       return;
     }
 
-    username = username.trim().toLowerCase().replace(/^@+/, '');
-    
-    // Auto-generate 7-digit numerical RoyalID
+    if (username.length < 3) {
+      res.status(400).json({ error: 'Username must be at least 3 characters' });
+      return;
+    }
+
+    // Generate unique 7-digit Royal ID
     let royal_id = generateRoyalId();
     let isUnique = false;
     let attempts = 0;
+
     while (!isUnique && attempts < 10) {
       const checkId = await query('SELECT id FROM users WHERE royal_id = $1', [royal_id]);
       if (checkId.rows.length === 0) {
@@ -54,18 +58,19 @@ router.post('/register', async (req: AuthRequest, res: Response): Promise<void> 
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    const defaultAvatar = avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
+    const defaultAvatar = avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${username}`;
+    const role = username.toLowerCase() === 'admin' ? 'admin' : 'user';
 
     const insertRes = await query(
-      `INSERT INTO users (username, royal_id, display_name, email, password_hash, avatar_url)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, username, royal_id, display_name, email, avatar_url, bio, storage_limit_bytes, storage_used_bytes, created_at`,
-      [username, royal_id, display_name.trim(), email || null, password_hash, defaultAvatar]
+      `INSERT INTO users (username, royal_id, display_name, email, password_hash, avatar_url, role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, username, royal_id, display_name, email, avatar_url, role, bio, storage_limit_bytes, storage_used_bytes, created_at`,
+      [username, royal_id, display_name.trim(), email || null, password_hash, defaultAvatar, role]
     );
 
     const user = insertRes.rows[0];
     const token = jwt.sign(
-      { id: user.id, username: user.username, royal_id: user.royal_id, display_name: user.display_name },
+      { id: user.id, username: user.username, royal_id: user.royal_id, display_name: user.display_name, role: user.role },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -84,7 +89,7 @@ router.post('/register', async (req: AuthRequest, res: Response): Promise<void> 
 // Login
 router.post('/login', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { identifier, password } = req.body; // identifier can be username OR royal_id OR email
+    const { identifier, password } = req.body;
 
     if (!identifier || !password) {
       res.status(400).json({ error: 'Identifier (username or RoyalID) and password are required' });
@@ -95,7 +100,7 @@ router.post('/login', async (req: AuthRequest, res: Response): Promise<void> => 
     const cleanIdentifier = rawIdentifier.replace(/^[@#]+/, '').trim();
 
     const userRes = await query(
-      `SELECT id, username, royal_id, display_name, email, password_hash, avatar_url, bio, 
+      `SELECT id, username, royal_id, display_name, email, password_hash, avatar_url, bio, role, is_blocked,
               storage_limit_bytes, storage_used_bytes, is_online, last_seen, created_at 
        FROM users 
        WHERE LOWER(username) = LOWER($1) 
@@ -112,6 +117,12 @@ router.post('/login', async (req: AuthRequest, res: Response): Promise<void> => 
     }
 
     const user = userRes.rows[0];
+
+    if (user.is_blocked) {
+      res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+      return;
+    }
+
     const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
@@ -121,8 +132,11 @@ router.post('/login', async (req: AuthRequest, res: Response): Promise<void> => 
 
     delete user.password_hash;
 
+    // Update last_active_at
+    await query('UPDATE users SET last_active_at = NOW() WHERE id = $1', [user.id]);
+
     const token = jwt.sign(
-      { id: user.id, username: user.username, royal_id: user.royal_id, display_name: user.display_name },
+      { id: user.id, username: user.username, royal_id: user.royal_id, display_name: user.display_name, role: user.role || 'user' },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -143,7 +157,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response): Pr
   try {
     const userId = req.user?.id;
     const userRes = await query(
-      `SELECT id, username, royal_id, display_name, email, avatar_url, bio, 
+      `SELECT id, username, royal_id, display_name, email, avatar_url, bio, role, is_blocked,
               storage_limit_bytes, storage_used_bytes, is_online, last_seen, created_at 
        FROM users WHERE id = $1`,
       [userId]
@@ -173,7 +187,7 @@ router.put('/me', authenticateToken, async (req: AuthRequest, res: Response): Pr
            avatar_url = COALESCE($3, avatar_url),
            updated_at = NOW()
        WHERE id = $4
-       RETURNING id, username, royal_id, display_name, email, avatar_url, bio, storage_limit_bytes, storage_used_bytes`,
+       RETURNING id, username, royal_id, display_name, email, avatar_url, bio, role, storage_limit_bytes, storage_used_bytes`,
       [display_name, bio, avatar_url, userId]
     );
 
@@ -183,44 +197,36 @@ router.put('/me', authenticateToken, async (req: AuthRequest, res: Response): Pr
   }
 });
 
-// Live Typeahead Search Users (Search by username, royal_id, or display_name as you type)
+// Search Users
 router.get('/search', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const rawQ = (req.query.q as string || '').trim();
-    const cleanQ = rawQ.replace(/^[@#]+/, '').trim();
+    const q = ((req.query.q as string) || '').trim();
     const currentUserId = req.user?.id;
 
-    if (!cleanQ || cleanQ.length === 0) {
+    if (!q) {
       res.json({ users: [] });
       return;
     }
 
-    const searchPattern = `%${cleanQ}%`;
-    const searchRes = await query(
-      `SELECT id, username, royal_id, display_name, avatar_url, bio, is_online, last_seen
+    const cleanQ = q.replace(/^[@#]+/, '').trim();
+
+    const usersRes = await query(
+      `SELECT id, username, royal_id, display_name, avatar_url, is_online, last_seen 
        FROM users 
-       WHERE id != $1 AND (
-         LOWER(username) LIKE LOWER($2) OR 
-         royal_id LIKE $2 OR 
-         LOWER(display_name) LIKE LOWER($2)
-       )
-       ORDER BY 
-         CASE 
-           WHEN LOWER(username) = LOWER($3) THEN 1
-           WHEN royal_id = $3 THEN 2
-           WHEN LOWER(username) LIKE LOWER($4) THEN 3
-           WHEN royal_id LIKE $4 THEN 4
-           ELSE 5 
-         END,
-         username ASC
-       LIMIT 20`,
-      [currentUserId, searchPattern, cleanQ, `${cleanQ}%`]
+       WHERE id != $1
+         AND (
+           LOWER(username) LIKE LOWER($2) 
+           OR LOWER(display_name) LIKE LOWER($2) 
+           OR royal_id = $3
+           OR LOWER(username) LIKE LOWER($4)
+         )
+       LIMIT 15`,
+      [currentUserId, `%${cleanQ}%`, cleanQ, `%${q}%`]
     );
 
-    res.json({ users: searchRes.rows });
+    res.json({ users: usersRes.rows });
   } catch (error: any) {
-    console.error('Search error:', error);
-    res.status(500).json({ error: 'User search failed' });
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 

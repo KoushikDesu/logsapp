@@ -4,6 +4,12 @@ import { authenticateToken, AuthRequest } from '../middleware/authMiddleware.js'
 
 const router = Router();
 
+function generateGroupRoyalId(): string {
+  const min = 1000000;
+  const max = 9999999;
+  return String(Math.floor(Math.random() * (max - min + 1)) + min);
+}
+
 // Get all chats for current user (1-on-1 and groups)
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -13,6 +19,8 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
       `SELECT 
          c.id, 
          c.is_group, 
+         c.is_public,
+         c.group_royal_id,
          c.name, 
          c.description, 
          c.avatar_url, 
@@ -32,6 +40,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
              'file_name', m.file_name,
              'file_size_bytes', m.file_size_bytes,
              'sender_id', m.sender_id,
+             'is_deleted', m.is_deleted,
              'created_at', m.created_at
            )
            FROM messages m 
@@ -77,6 +86,73 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
   } catch (error: any) {
     console.error('Error fetching chats:', error);
     res.status(500).json({ error: 'Failed to fetch chats' });
+  }
+});
+
+// Search Public Groups
+router.get('/search/groups', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const q = ((req.query.q as string) || '').trim().replace(/^[#@]+/, '');
+    const userId = req.user?.id;
+
+    if (!q) {
+      // Return top 15 public groups
+      const topGroups = await query(`
+        SELECT c.id, c.name, c.description, c.avatar_url, c.group_royal_id, c.is_public, c.created_at,
+               (SELECT COUNT(*) FROM chat_participants WHERE chat_id = c.id)::int as participant_count,
+               EXISTS(SELECT 1 FROM chat_participants WHERE chat_id = c.id AND user_id = $1) as is_member
+        FROM chats c
+        WHERE c.is_group = true AND c.is_public = true
+        ORDER BY c.updated_at DESC
+        LIMIT 15
+      `, [userId]);
+      res.json({ groups: topGroups.rows });
+      return;
+    }
+
+    const groupsRes = await query(`
+      SELECT c.id, c.name, c.description, c.avatar_url, c.group_royal_id, c.is_public, c.created_at,
+             (SELECT COUNT(*) FROM chat_participants WHERE chat_id = c.id)::int as participant_count,
+             EXISTS(SELECT 1 FROM chat_participants WHERE chat_id = c.id AND user_id = $1) as is_member
+      FROM chats c
+      WHERE c.is_group = true AND c.is_public = true
+        AND (LOWER(c.name) LIKE LOWER($2) OR c.group_royal_id = $3)
+      ORDER BY c.updated_at DESC
+      LIMIT 20
+    `, [userId, `%${q}%`, q]);
+
+    res.json({ groups: groupsRes.rows });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to search public groups' });
+  }
+});
+
+// Join a Public Group
+router.post('/group/join/:groupId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const groupId = req.params.groupId as string;
+    const userId = req.user?.id;
+
+    const groupCheck = await query('SELECT id, is_public, name FROM chats WHERE id = $1 AND is_group = true', [groupId]);
+    if (groupCheck.rows.length === 0) {
+      res.status(404).json({ error: 'Group not found' });
+      return;
+    }
+
+    if (!groupCheck.rows[0].is_public) {
+      res.status(403).json({ error: 'This is a private group. You need an invitation from the creator.' });
+      return;
+    }
+
+    await query(`
+      INSERT INTO chat_participants (chat_id, user_id, role)
+      VALUES ($1, $2, 'member')
+      ON CONFLICT (chat_id, user_id) DO NOTHING
+    `, [groupId, userId]);
+
+    res.json({ message: `Successfully joined ${groupCheck.rows[0].name}`, chatId: groupId });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to join group' });
   }
 });
 
@@ -142,25 +218,26 @@ router.post('/direct', authenticateToken, async (req: AuthRequest, res: Response
   }
 });
 
-// Create Group Chat
+// Create Group Chat (Public or Private with 7-digit Group Royal ID)
 router.post('/group', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const { name, description, avatar_url, member_ids, max_storage_bytes } = req.body;
+    const { name, description, avatar_url, member_ids, is_public, max_storage_bytes } = req.body;
 
     if (!name || !name.trim()) {
       res.status(400).json({ error: 'Group name is required' });
       return;
     }
 
-    const groupAvatar = avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(name)}`;
+    const groupAvatar = avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(name.trim())}`;
     const storageLimit = max_storage_bytes ? Number(max_storage_bytes) : 1073741824; // 1 GB default
+    const groupRoyalId = generateGroupRoyalId();
 
     const newGroupRes = await query(
-      `INSERT INTO chats (is_group, name, description, avatar_url, created_by, max_storage_bytes)
-       VALUES (TRUE, $1, $2, $3, $4, $5)
-       RETURNING id, is_group, name, description, avatar_url, created_by, max_storage_bytes, current_storage_bytes, created_at`,
-      [name.trim(), description || null, groupAvatar, userId, storageLimit]
+      `INSERT INTO chats (is_group, is_public, group_royal_id, name, description, avatar_url, created_by, max_storage_bytes)
+       VALUES (TRUE, $1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, is_group, is_public, group_royal_id, name, description, avatar_url, created_by, max_storage_bytes, current_storage_bytes, created_at`,
+      [Boolean(is_public), groupRoyalId, name.trim(), description || null, groupAvatar, userId, storageLimit]
     );
 
     const group = newGroupRes.rows[0];
@@ -179,153 +256,50 @@ router.post('/group', authenticateToken, async (req: AuthRequest, res: Response)
           await query(
             `INSERT INTO chat_participants (chat_id, user_id, role)
              VALUES ($1, $2, 'member')
-             ON CONFLICT DO NOTHING`,
+             ON CONFLICT (chat_id, user_id) DO NOTHING`,
             [group.id, mId]
           );
         }
       }
     }
 
-    res.status(201).json({ group });
+    res.status(201).json({ group, chat: group });
   } catch (error: any) {
     console.error('Error creating group:', error);
     res.status(500).json({ error: 'Failed to create group' });
   }
 });
 
-// Get Chat Details & Participants
-router.get('/:chatId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+// Add Members to Group (New members can see past messages)
+router.post('/group/:groupId/members', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const chatId = req.params.chatId as string;
+    const groupId = req.params.groupId as string;
     const userId = req.user?.id;
+    const { userIds } = req.body;
 
-    // Verify membership
-    const memberCheck = await query(
-      'SELECT role FROM chat_participants WHERE chat_id = $1 AND user_id = $2',
-      [chatId, userId]
-    );
-
-    if (memberCheck.rows.length === 0) {
-      res.status(403).json({ error: 'Not a participant of this chat' });
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      res.status(400).json({ error: 'userIds array is required' });
       return;
     }
 
-    const chatRes = await query(
-      `SELECT c.*, 
-              (
-                SELECT json_agg(json_build_object(
-                  'id', u.id,
-                  'username', u.username,
-                  'royal_id', u.royal_id,
-                  'display_name', u.display_name,
-                  'avatar_url', u.avatar_url,
-                  'is_online', u.is_online,
-                  'last_seen', u.last_seen,
-                  'role', cp.role,
-                  'joined_at', cp.joined_at
-                ))
-                FROM chat_participants cp
-                JOIN users u ON u.id = cp.user_id
-                WHERE cp.chat_id = c.id
-              ) as participants
-       FROM chats c
-       WHERE c.id = $1`,
-      [chatId]
-    );
-
-    if (chatRes.rows.length === 0) {
-      res.status(404).json({ error: 'Chat not found' });
+    // Check if group exists and user is admin or if public
+    const groupRes = await query('SELECT is_public, created_by FROM chats WHERE id = $1 AND is_group = true', [groupId]);
+    if (groupRes.rows.length === 0) {
+      res.status(404).json({ error: 'Group not found' });
       return;
     }
 
-    res.json({ chat: chatRes.rows[0] });
-  } catch (error: any) {
-    console.error('Error fetching chat details:', error);
-    res.status(500).json({ error: 'Failed to fetch chat details' });
-  }
-});
-
-// Update Chat Settings / Storage limit
-router.patch('/:chatId/settings', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const chatId = req.params.chatId as string;
-    const userId = req.user?.id;
-    const { max_storage_bytes, name, description, avatar_url } = req.body;
-
-    const chatRes = await query('SELECT created_by, is_group FROM chats WHERE id = $1', [chatId]);
-    if (chatRes.rows.length === 0) {
-      res.status(404).json({ error: 'Chat not found' });
-      return;
-    }
-
-    const updateRes = await query(
-      `UPDATE chats 
-       SET max_storage_bytes = COALESCE($1, max_storage_bytes),
-           name = COALESCE($2, name),
-           description = COALESCE($3, description),
-           avatar_url = COALESCE($4, avatar_url),
-           updated_at = NOW()
-       WHERE id = $5
-       RETURNING *`,
-      [max_storage_bytes, name, description, avatar_url, chatId]
-    );
-
-    res.json({ chat: updateRes.rows[0] });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to update chat settings' });
-  }
-});
-
-// Add members to group
-router.post('/:chatId/members', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const chatId = req.params.chatId as string;
-    const { user_ids } = req.body;
-
-    if (!Array.isArray(user_ids) || user_ids.length === 0) {
-      res.status(400).json({ error: 'user_ids array required' });
-      return;
-    }
-
-    for (const uId of user_ids) {
-      await query(
-        `INSERT INTO chat_participants (chat_id, user_id, role)
-         VALUES ($1, $2, 'member')
-         ON CONFLICT (chat_id, user_id) DO NOTHING`,
-        [chatId, uId]
-      );
+    for (const uId of userIds) {
+      await query(`
+        INSERT INTO chat_participants (chat_id, user_id, role)
+        VALUES ($1, $2, 'member')
+        ON CONFLICT (chat_id, user_id) DO NOTHING
+      `, [groupId, uId]);
     }
 
     res.json({ message: 'Members added successfully' });
   } catch (error: any) {
-    res.status(500).json({ error: 'Failed to add members' });
-  }
-});
-
-// Leave / Remove from group
-router.delete('/:chatId/members/:targetUserId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const chatId = req.params.chatId as string;
-    const targetUserId = req.params.targetUserId as string;
-    const userId = req.user?.id;
-
-    if (userId !== targetUserId) {
-      const adminCheck = await query(
-        "SELECT role FROM chat_participants WHERE chat_id = $1 AND user_id = $2 AND role = 'admin'",
-        [chatId, userId]
-      );
-      if (adminCheck.rows.length === 0) {
-        res.status(403).json({ error: 'Only admins can remove members' });
-        return;
-      }
-      await query('DELETE FROM chat_participants WHERE chat_id = $1 AND user_id = $2', [chatId, targetUserId]);
-      res.json({ message: 'Participant removed' });
-    } else {
-      await query('DELETE FROM chat_participants WHERE chat_id = $1 AND user_id = $2', [chatId, userId]);
-      res.json({ message: 'Left chat successfully' });
-    }
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to remove member' });
+    res.status(500).json({ error: 'Failed to add group members' });
   }
 });
 
@@ -334,15 +308,10 @@ router.post('/:chatId/read', authenticateToken, async (req: AuthRequest, res: Re
   try {
     const chatId = req.params.chatId as string;
     const userId = req.user?.id;
-    await query(
-      `UPDATE chat_participants 
-       SET last_read_at = NOW() 
-       WHERE chat_id = $1 AND user_id = $2`,
-      [chatId, userId]
-    );
+    await query('UPDATE chat_participants SET last_read_at = NOW() WHERE chat_id = $1 AND user_id = $2', [chatId, userId]);
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to mark read' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to mark as read' });
   }
 });
 

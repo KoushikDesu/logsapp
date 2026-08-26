@@ -13,9 +13,17 @@ import chatRoutes from './routes/chatRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import fileRoutes from './routes/fileRoutes.js';
 import cliRoutes from './routes/cliRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+import blockRoutes from './routes/blockRoutes.js';
+import aliasRoutes from './routes/aliasRoutes.js';
+import callRoutes from './routes/callRoutes.js';
+
 import { setupSocketHandler } from './socket/socketHandler.js';
 import { query } from './config/db.js';
+import { runMigrations } from './config/migrations.js';
 import { checkAndPurgeChatStorage } from './services/storagePurgeService.js';
+import { runInactivityPurge } from './services/inactivityPurgeService.js';
 
 dotenv.config();
 
@@ -54,8 +62,7 @@ if (!fs.existsSync(uploadDir)) {
 const serveCliScript = (req: express.Request, res: express.Response) => {
   const cliPaths = [
     path.resolve('../cli/logsapp-cli.py'),
-    path.resolve('./cli/logsapp-cli.py'),
-    path.resolve(__dirname, '../../cli/logsapp-cli.py')
+    path.resolve('./cli/logsapp-cli.py')
   ];
   const found = cliPaths.find(p => fs.existsSync(p));
   if (found) {
@@ -85,31 +92,42 @@ app.use('/files', fileRoutes);
 app.use('/api/cli', cliRoutes);
 app.use('/cli', cliRoutes);
 
+app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
+
+app.use('/api/reports', reportRoutes);
+app.use('/reports', reportRoutes);
+
+app.use('/api/blocks', blockRoutes);
+app.use('/blocks', blockRoutes);
+
+app.use('/api/aliases', aliasRoutes);
+app.use('/aliases', aliasRoutes);
+
+app.use('/api/calls', callRoutes);
+app.use('/calls', callRoutes);
+
 // Health check endpoint
 const healthHandler = (req: express.Request, res: express.Response) => {
-  res.json({ status: 'ok', app: 'LogsApp / RoyalChat', version: '1.0.0', time: new Date().toISOString(), vercel: Boolean(process.env.VERCEL) });
+  res.json({
+    status: 'ok',
+    app: 'LogsApp Web Chat',
+    version: '2.0.0',
+    time: new Date().toISOString(),
+    features: ['1GB transfers', 'Admin Dashboard', 'Reports & Blocks', 'Audio Calling', 'Public/Private Groups', 'Custom Nicknames', 'Inactivity Purge']
+  });
 };
 app.get('/api/health', healthHandler);
 app.get('/health', healthHandler);
 
-// Serve frontend static files if built in production
-const clientDistPath = path.resolve('../client/dist');
-const clientDistLocal = path.resolve('./client/dist');
-const distDir = fs.existsSync(clientDistPath) ? clientDistPath : fs.existsSync(clientDistLocal) ? clientDistLocal : null;
-
-if (distDir) {
-  app.use(express.static(distDir));
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(distDir, 'index.html'));
-    }
-  });
-}
-
 // Initialize Socket.io Real-time engine
 setupSocketHandler(io);
 
-// Background worker: Periodic Storage Quota Auto-Purge Check (Runs every 10 minutes)
+// Background workers
+// 1. Run migrations at startup
+runMigrations().catch(console.error);
+
+// 2. Periodic Storage Quota Auto-Purge Check (Runs every 10 minutes)
 setInterval(async () => {
   try {
     const chats = await query('SELECT id FROM chats');
@@ -121,14 +139,26 @@ setInterval(async () => {
   }
 }, 10 * 60 * 1000);
 
+// 3. 30-Day Inactivity Auto-Purge Check (Runs daily)
+setInterval(async () => {
+  try {
+    await runInactivityPurge();
+  } catch (err) {
+    console.error('[Inactivity Purge Error]:', err);
+  }
+}, 24 * 60 * 60 * 1000);
+
+// Initial check on startup
+runInactivityPurge().catch(console.error);
+
 // Start Server if not imported as a serverless module
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, () => {
     console.log(`=======================================================`);
-    console.log(`🚀 LogsApp / RoyalChat Server running on http://localhost:${PORT}`);
-    console.log(`📦 Max upload limit: 1GB | Auto-Purge Storage Monitor: Active`);
-    console.log(`💬 Real-Time WebSockets: Ready`);
-    console.log(`💻 Linux CLI endpoint: http://localhost:${PORT}/api/cli/install.sh`);
+    console.log(`🚀 LogsApp 2.0 Server running on http://localhost:${PORT}`);
+    console.log(`📦 1GB Storage & 30-day Inactivity Purge: Active`);
+    console.log(`🛡️ Admin Moderation, Reports, & Blocking: Enabled`);
+    console.log(`📞 WebRTC Audio Calling & Group Discovery: Ready`);
     console.log(`=======================================================`);
   });
 }

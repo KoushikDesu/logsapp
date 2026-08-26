@@ -1,5 +1,5 @@
 /* ============================================================
-   LogsApp — Frosted Glassmorphism & Flawless Light/Dark Theme
+   LogsApp 2.0 — Frosted Glassmorphism, Rounded UI & Flawless Themes
    ============================================================ */
 
 :root {
@@ -58,63 +58,63 @@ body {
 
 /* ─── Glassmorphism Panels ─────────────────────────────────── */
 .glass-card-dark {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 45px 0 rgba(0, 0, 0, 0.6);
   color: #f8fafc;
 }
 
 .glass-card-light {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(226, 232, 240, 0.95);
   box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.08);
   color: #0f172a;
 }
 
 .glass-nav-dark {
-  background: rgba(11, 16, 28, 0.8);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(11, 16, 28, 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border-color: rgba(255, 255, 255, 0.08);
   color: #f8fafc;
 }
 
 .glass-nav-light {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border-color: #e2e8f0;
   color: #0f172a;
 }
 
-/* ─── Custom Message Bubbles (No text collision) ───────────── */
+/* ─── Custom Message Bubbles ───────────────────────────────── */
 .bubble-sent {
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #ffffff !important;
-  border-radius: 18px 18px 3px 18px;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+  border-radius: 20px 20px 4px 20px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .bubble-received-dark {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(30, 41, 59, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   color: #f8fafc !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px 18px 18px 3px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  border-radius: 20px 20px 20px 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
 .bubble-received-light {
   background: #ffffff;
   color: #0f172a !important;
   border: 1px solid #e2e8f0;
-  border-radius: 18px 18px 18px 3px;
+  border-radius: 20px 20px 20px 4px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
@@ -142,4 +142,13 @@ body {
 
 .modal-enter {
   animation: modalScale 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(37, 99, 235, 0.4); }
+  50% { box-shadow: 0 0 30px rgba(37, 99, 235, 0.8); }
+}
+
+.call-pulse {
+  animation: pulseGlow 1.8s infinite;
 }
