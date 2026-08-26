@@ -24,8 +24,8 @@
   <!-- Dedicated Isolated Call Overlay Container (Zero UI glitching) -->
   <div id="call-container" class="pointer-events-none fixed inset-0 z-50"></div>
 
-  <!-- WebRTC Remote Audio Stream Player -->
-  <audio id="remote-audio" autoplay playsinline style="display:none;"></audio>
+  <!-- WebRTC Remote Audio Stream Player (Active DOM node) -->
+  <audio id="remote-audio" autoplay playsinline style="position:fixed; top:-1000px; left:-1000px; width:1px; height:1px; opacity:0; pointer-events:none;"></audio>
 
   <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" style="bottom: max(1.25rem, env(safe-area-inset-bottom));"></div>

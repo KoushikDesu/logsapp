@@ -1,8 +1,8 @@
 // ============================================================
 // LogsApp 2.0 — Enterprise Web Messenger & 1GB Bridge
-// Features: Glitch-Free WebRTC Audio Calls, Admin Dashboard,
-// Reports & Blocks, Public/Private Groups, Custom Nicknames,
-// Forward/Delete/Clear, Direct Download, Deterministic Avatars
+// Features: Two-Way WebRTC Voice Calls, Ringtone Chime,
+// Draggable Call Widget, Message Yourself (You), Admin Shield,
+// Reports & Blocks, Public/Private Groups, Custom Nicknames
 // ============================================================
 
 // Brand Logo SVG
@@ -169,7 +169,10 @@ export function downloadFileDirect(downloadUrl, filename) {
 }
 
 // Get contact display name taking user's custom alias into account
-export function getContactDisplayName(contact) {
+export function getContactDisplayName(contact, isSelf = false) {
+  if (isSelf) {
+    return `${state.user?.display_name || 'You'} (You)`;
+  }
   if (!contact) return 'Unknown User';
   if (state.aliases[contact.id]) {
     return `${state.aliases[contact.id]} (${contact.display_name})`;
@@ -195,6 +198,60 @@ function showToast(msg, type = 'info') {
     toast.classList.add('opacity-0', 'translate-y-2');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+// ============================================================
+// WEBAUDIO RINGTONE CHIME SYNTHESIZER
+// ============================================================
+let ringtoneInterval = null;
+let ringtoneAudioCtx = null;
+
+function playRingtoneSound() {
+  stopRingtoneSound();
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    ringtoneAudioCtx = new AudioCtx();
+
+    function triggerChime() {
+      if (!ringtoneAudioCtx || ringtoneAudioCtx.state === 'closed') return;
+      if (ringtoneAudioCtx.state === 'suspended') ringtoneAudioCtx.resume();
+
+      const now = ringtoneAudioCtx.currentTime;
+      const osc1 = ringtoneAudioCtx.createOscillator();
+      const osc2 = ringtoneAudioCtx.createOscillator();
+      const gain = ringtoneAudioCtx.createGain();
+
+      osc1.type = 'sine';
+      osc2.type = 'sine';
+      osc1.frequency.setValueAtTime(480, now);
+      osc2.frequency.setValueAtTime(440, now);
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ringtoneAudioCtx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 1.4);
+      osc2.stop(now + 1.4);
+    }
+
+    triggerChime();
+    ringtoneInterval = setInterval(triggerChime, 2600);
+  } catch (e) {}
+}
+
+function stopRingtoneSound() {
+  clearInterval(ringtoneInterval);
+  ringtoneInterval = null;
+  if (ringtoneAudioCtx) {
+    try { ringtoneAudioCtx.close(); } catch (e) {}
+    ringtoneAudioCtx = null;
+  }
 }
 
 // Master Render (Renders #app without flickering call timers)
@@ -430,11 +487,11 @@ function bindAuthEvents() {
 }
 
 // ============================================================
-// SIDEBAR & CHAT LIST
+// SIDEBAR & CHAT LIST (With Pinned "Message Yourself (You)")
 // ============================================================
 function renderSidebarHeader() {
   const avatar = getUserAvatar(state.user);
-  const isAdmin = state.user?.role === 'admin' || state.user?.username === 'admin';
+  const isAdmin = state.user?.role === 'admin' || state.user?.username === 'logsappkt' || state.user?.username === 'admin';
 
   return `
   <div class="h-16 px-4 flex items-center justify-between border-b ${state.isDark ? 'glass-nav-dark' : 'glass-nav-light'} shrink-0">
@@ -541,10 +598,11 @@ function renderChatList() {
   <div class="flex-1 overflow-y-auto divide-y ${state.isDark ? 'divide-white/5' : 'divide-slate-200/60'}">
     ${state.chats.map(chat => {
       const isActive = chat.id === state.activeChatId;
-      const other = !chat.is_group && chat.other_participants ? chat.other_participants[0] : null;
-      const title = chat.is_group ? chat.name : getContactDisplayName(other);
-      const avatar = chat.is_group ? (chat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${chat.name}`) : getUserAvatar(other);
-      const lastMsg = chat.last_message ? (chat.last_message.is_deleted ? '🚫 This message was deleted' : (chat.last_message.message_type !== 'text' ? `📎 [${chat.last_message.message_type.toUpperCase()}] ${chat.last_message.file_name || ''}` : chat.last_message.content)) : 'No messages yet';
+      const isSelf = Boolean(chat.is_self);
+      const other = !chat.is_group && !isSelf && chat.other_participants ? chat.other_participants[0] : null;
+      const title = isSelf ? `${state.user?.display_name || 'You'} (You)` : (chat.is_group ? chat.name : getContactDisplayName(other));
+      const avatar = isSelf ? getUserAvatar(state.user) : (chat.is_group ? (chat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${chat.name}`) : getUserAvatar(other));
+      const lastMsg = chat.last_message ? (chat.last_message.is_deleted ? '🚫 This message was deleted' : (chat.last_message.message_type !== 'text' ? `📎 [${chat.last_message.message_type.toUpperCase()}] ${chat.last_message.file_name || ''}` : chat.last_message.content)) : (isSelf ? 'Message yourself • Notes & 1GB files' : 'No messages yet');
       const time = chat.last_message?.created_at ? new Date(chat.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const unreadCount = Number(chat.unread_count || 0);
       const hasUnread = unreadCount > 0;
@@ -552,9 +610,10 @@ function renderChatList() {
 
       return `
       <div class="chat-list-item relative flex items-center gap-3 p-3.5 cursor-pointer transition-all ${isActive ? (state.isDark ? 'bg-blue-600/20 border-l-4 border-blue-500' : 'bg-blue-50 border-l-4 border-blue-600') : 'hover:bg-white/10'}" data-chat-id="${chat.id}">
-        <!-- Avatar with unread indicator dot -->
+        <!-- Avatar with unread / self indicator dot -->
         <div class="relative shrink-0">
           <img src="${avatar}" class="w-12 h-12 rounded-2xl object-cover bg-slate-900 border ${state.isDark ? 'border-white/10' : 'border-slate-200'} shadow-sm" />
+          ${isSelf ? `<span class="absolute -bottom-1 -right-1 p-0.5 bg-blue-600 text-white rounded-full text-[10px] mdi mdi-bookmark-check"></span>` : ''}
           ${chat.is_group ? `<span class="absolute -bottom-1 -right-1 p-0.5 bg-blue-600 text-white rounded-full text-[10px] mdi mdi-account-multiple"></span>` : ''}
           ${hasUnread ? `<span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 border-2 ${state.isDark ? 'border-slate-950' : 'border-white'} rounded-full shadow-lg shadow-blue-500/60 animate-pulse"></span>` : ''}
         </div>
@@ -563,6 +622,7 @@ function renderChatList() {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-1.5 truncate">
               <h4 class="font-semibold text-sm truncate ${hasUnread ? 'text-blue-500 font-bold' : (state.isDark ? 'text-slate-100' : 'text-slate-900')}">${title}</h4>
+              ${isSelf ? `<span class="text-[9px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.2 rounded font-mono font-bold">You</span>` : ''}
               ${isBlocked ? `<span class="text-[9px] bg-red-500/15 text-red-400 border border-red-500/25 px-1 py-0.2 rounded font-mono">BLOCKED</span>` : ''}
             </div>
             <div class="flex items-center gap-1.5 shrink-0 ml-2">
@@ -577,6 +637,7 @@ function renderChatList() {
           </div>
 
           <div class="flex items-center gap-2 mt-1">
+            ${isSelf ? `<span class="inline-block text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-md border border-emerald-500/20 font-bold">Personal Vault</span>` : ''}
             ${other ? `<span class="inline-block text-[9px] font-mono text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded-md border border-amber-500/20 font-bold">#${other.royal_id}</span>` : ''}
             ${chat.is_group ? `<span class="inline-block text-[9px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded-md border border-blue-500/20 font-bold">#GRP-${chat.group_royal_id || 'PUBLIC'}</span>` : ''}
             ${chat.is_group && chat.is_public ? `<span class="text-[9px] text-emerald-400 bg-emerald-500/10 px-1 rounded border border-emerald-500/20">Public</span>` : ''}
@@ -606,9 +667,10 @@ function renderChatArea() {
     </div>`;
   }
 
-  const other = !activeChat.is_group && activeChat.other_participants ? activeChat.other_participants[0] : null;
-  const title = activeChat.is_group ? activeChat.name : getContactDisplayName(other);
-  const avatar = activeChat.is_group ? (activeChat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${activeChat.name}`) : getUserAvatar(other);
+  const isSelf = Boolean(activeChat.is_self);
+  const other = !activeChat.is_group && !isSelf && activeChat.other_participants ? activeChat.other_participants[0] : null;
+  const title = isSelf ? `${state.user?.display_name || 'You'} (You)` : (activeChat.is_group ? activeChat.name : getContactDisplayName(other));
+  const avatar = isSelf ? getUserAvatar(state.user) : (activeChat.is_group ? (activeChat.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${activeChat.name}`) : getUserAvatar(other));
   const isBlocked = other && state.blockedUserIds.has(other.id);
 
   return `
@@ -621,16 +683,17 @@ function renderChatArea() {
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <h3 class="font-semibold text-sm truncate ${state.isDark ? 'text-slate-100' : 'text-slate-900'}">${title}</h3>
+            ${isSelf ? `<span class="text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded-md border border-blue-500/20">Personal Vault</span>` : ''}
             ${other ? `<span class="text-[10px] font-mono font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded-md border border-amber-500/20">#${other.royal_id}</span>` : ''}
             ${activeChat.is_group ? `<span class="text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded-md border border-blue-500/20">#GRP-${activeChat.group_royal_id || 'PUBLIC'}</span>` : ''}
           </div>
-          <p class="text-[11px] ${state.isDark ? 'text-slate-400' : 'text-slate-500'}">${activeChat.is_group ? `${activeChat.participant_count || 2} members ${activeChat.is_public ? '• Public Group' : '• Private Group'}` : (other ? `@${other.username}` : 'Direct Chat')}</p>
+          <p class="text-[11px] ${state.isDark ? 'text-slate-400' : 'text-slate-500'}">${isSelf ? 'Message yourself • Personal notes & 1GB transfers' : (activeChat.is_group ? `${activeChat.participant_count || 2} members ${activeChat.is_public ? '• Public Group' : '• Private Group'}` : (other ? `@${other.username}` : 'Direct Chat'))}</p>
         </div>
       </div>
 
       <!-- Action Buttons in Header -->
       <div class="flex items-center gap-1.5 ${state.isDark ? 'text-slate-400' : 'text-slate-500'}">
-        ${!activeChat.is_group && other ? `
+        ${!activeChat.is_group && !isSelf && other ? `
           <button id="btn-start-call" class="p-2 hover:bg-white/10 rounded-2xl text-emerald-500 hover:text-emerald-400 transition-all" title="Start WebRTC Audio Call"><span class="mdi mdi-phone text-lg"></span></button>
         ` : ''}
         <button id="btn-chat-storage" class="p-2 hover:bg-white/10 rounded-2xl text-amber-500 hover:text-amber-400 transition-all" title="Storage Quota"><span class="mdi mdi-harddisk text-lg"></span></button>
@@ -641,7 +704,7 @@ function renderChatArea() {
           
           ${state.showChatMenu ? `
             <div class="absolute right-0 top-full mt-2 w-56 ${state.isDark ? 'glass-card-dark border-white/10 divide-white/5' : 'glass-card-light border-slate-200 divide-slate-100'} rounded-2xl shadow-2xl divide-y border z-50 text-xs overflow-hidden modal-enter">
-              ${!activeChat.is_group && other ? `
+              ${!activeChat.is_group && !isSelf && other ? `
                 <button id="menu-set-alias" class="w-full text-left p-3 hover:bg-blue-500/10 flex items-center gap-2 transition-colors"><span class="mdi mdi-pencil text-blue-400"></span> Edit Custom Nickname</button>
                 <button id="menu-report-user" class="w-full text-left p-3 hover:bg-red-500/10 text-red-400 flex items-center gap-2 transition-colors"><span class="mdi mdi-flag-outline"></span> Report User to Admin</button>
                 <button id="menu-toggle-block" class="w-full text-left p-3 hover:bg-red-500/10 ${isBlocked ? 'text-emerald-400' : 'text-red-400'} flex items-center gap-2 transition-colors"><span class="mdi ${isBlocked ? 'mdi-account-check' : 'mdi-account-cancel'}"></span> ${isBlocked ? 'Unblock User' : 'Block User'}</button>
@@ -658,8 +721,8 @@ function renderChatArea() {
       ${state.activeMessages.length === 0 ? `
         <div class="flex flex-col items-center justify-center h-full text-center text-xs space-y-2 ${state.isDark ? 'text-slate-400' : 'text-slate-500'}">
           <span class="mdi mdi-message-text-outline text-3xl text-blue-500/40"></span>
-          <p class="font-semibold ${state.isDark ? 'text-slate-300' : 'text-slate-700'}">No messages yet</p>
-          <p>Send a message or attach any file up to 1GB!</p>
+          <p class="font-semibold ${state.isDark ? 'text-slate-300' : 'text-slate-700'}">${isSelf ? 'Your Personal Notes & 1GB Cloud Vault' : 'No messages yet'}</p>
+          <p>${isSelf ? 'Send notes, copy code, or store files up to 1GB to access across devices & Linux CLI!' : 'Send a message or attach any file up to 1GB!'}</p>
         </div>
       ` : state.activeMessages.map(msg => renderMessageBubble(msg, msg.sender_id === state.user.id)).join('')}
     </div>
@@ -674,7 +737,7 @@ function renderChatArea() {
         <form id="chat-input-form" class="flex items-center gap-2 max-w-5xl mx-auto">
           <input type="file" id="file-upload-input" class="hidden" />
           <button type="button" id="btn-attach-file" class="p-2.5 ${state.isDark ? 'text-slate-400 hover:text-blue-400' : 'text-slate-500 hover:text-blue-600'} rounded-2xl hover:bg-white/10 transition-all" title="Attach file (up to 1GB)"><span class="mdi mdi-paperclip text-xl"></span></button>
-          <input type="text" id="chat-message-input" placeholder="Type a message..." class="flex-1 py-2.5 px-4 rounded-2xl text-sm ${state.isDark ? 'bg-slate-900/70 border-white/10 text-slate-100 placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 shadow-sm'} border focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-md transition-all" />
+          <input type="text" id="chat-message-input" placeholder="${isSelf ? 'Message yourself (notes, links, code)...' : 'Type a message...'}" class="flex-1 py-2.5 px-4 rounded-2xl text-sm ${state.isDark ? 'bg-slate-900/70 border-white/10 text-slate-100 placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 shadow-sm'} border focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-md transition-all" />
           <button type="submit" class="p-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl shadow-lg shadow-blue-500/25 border border-white/10 shrink-0 transition-all flex items-center justify-center"><span class="mdi mdi-send text-base"></span></button>
         </form>
       `}
@@ -751,7 +814,7 @@ function renderMessageBubble(msg, isMe) {
 }
 
 // ============================================================
-// ISOLATED WEBRTC AUDIO CALL OVERLAY (Zero Glitches)
+// DRAGGABLE WEBRTC AUDIO CALL OVERLAY (Zero UI Glitching)
 // ============================================================
 function renderCallOverlay() {
   const container = document.getElementById('call-container');
@@ -759,6 +822,7 @@ function renderCallOverlay() {
 
   const call = state.activeCall;
   if (!call) {
+    stopRingtoneSound();
     container.innerHTML = '';
     return;
   }
@@ -768,6 +832,7 @@ function renderCallOverlay() {
   const otherAvatar = isCaller ? (call.receiver_avatar || getDeterministicAnimeAvatar(call.receiver_id).url) : (call.caller_avatar || getDeterministicAnimeAvatar(call.caller_id).url);
 
   if (call.status === 'ringing') {
+    playRingtoneSound();
     if (!isCaller) {
       // Incoming Call Ringing Banner
       container.innerHTML = `
@@ -799,14 +864,18 @@ function renderCallOverlay() {
       </div>`;
     }
   } else if (call.status === 'accepted') {
-    // Active In-Call Floating Widget
+    stopRingtoneSound();
+    // Active In-Call Draggable Floating Widget
     const minutes = Math.floor(state.callDuration / 60).toString().padStart(2, '0');
     const seconds = (state.callDuration % 60).toString().padStart(2, '0');
 
     container.innerHTML = `
-    <div class="fixed bottom-6 right-6 z-50 p-4 glass-card-dark rounded-3xl shadow-2xl border border-emerald-500/40 flex items-center gap-4 pointer-events-auto animate-in fade-in">
-      <img src="${otherAvatar}" class="w-10 h-10 rounded-2xl object-cover border-2 border-emerald-500" />
-      <div>
+    <div id="draggable-call-widget" class="fixed top-20 right-4 md:right-8 z-50 p-3.5 px-4 glass-card-dark rounded-3xl shadow-2xl border border-emerald-500/40 flex items-center gap-3.5 pointer-events-auto cursor-grab touch-none select-none animate-in fade-in">
+      <div class="flex items-center gap-1 text-slate-400 mr-0.5 text-xs">
+        <span class="mdi mdi-drag-vertical"></span>
+      </div>
+      <img src="${otherAvatar}" class="w-10 h-10 rounded-2xl object-cover border-2 border-emerald-500 pointer-events-none" />
+      <div class="pointer-events-none">
         <h4 class="font-bold text-xs text-white">${otherName}</h4>
         <span id="call-timer-text" class="text-[11px] font-mono text-emerald-400 font-bold">${minutes}:${seconds}</span>
       </div>
@@ -819,6 +888,8 @@ function renderCallOverlay() {
         </button>
       </div>
     </div>`;
+
+    initDraggableCallWidget();
   }
 
   // Bind Call Event Buttons
@@ -832,6 +903,60 @@ function renderCallOverlay() {
       renderCallOverlay();
     }
   });
+}
+
+// Drag helper for floating in-call widget
+function initDraggableCallWidget() {
+  const widget = document.getElementById('draggable-call-widget');
+  if (!widget) return;
+
+  let isDragging = false;
+  let startX = 0, startY = 0, initialX = 0, initialY = 0;
+
+  const onPointerDown = (e) => {
+    if (e.target.closest('button')) return;
+    isDragging = true;
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    startX = clientX;
+    startY = clientY;
+
+    const rect = widget.getBoundingClientRect();
+    initialX = rect.left;
+    initialY = rect.top;
+
+    widget.style.bottom = 'auto';
+    widget.style.right = 'auto';
+    widget.style.left = `${initialX}px`;
+    widget.style.top = `${initialY}px`;
+    widget.classList.add('cursor-grabbing');
+  };
+
+  const onPointerMove = (e) => {
+    if (!isDragging) return;
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+
+    const newX = Math.max(10, Math.min(window.innerWidth - widget.offsetWidth - 10, initialX + dx));
+    const newY = Math.max(10, Math.min(window.innerHeight - widget.offsetHeight - 10, initialY + dy));
+
+    widget.style.left = `${newX}px`;
+    widget.style.top = `${newY}px`;
+  };
+
+  const onPointerUp = () => {
+    isDragging = false;
+    widget.classList.remove('cursor-grabbing');
+  };
+
+  widget.addEventListener('mousedown', onPointerDown);
+  widget.addEventListener('touchstart', onPointerDown, { passive: true });
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('touchmove', onPointerMove, { passive: true });
+  window.addEventListener('mouseup', onPointerUp);
+  window.addEventListener('touchend', onPointerUp);
 }
 
 // ============================================================
@@ -1062,7 +1187,7 @@ function renderForwardModal() {
         <label class="block text-xs font-semibold ${state.isDark ? 'text-slate-300' : 'text-slate-600'}">Select Chat to Forward to:</label>
         ${state.chats.map(c => `
           <div class="forward-target-item flex items-center justify-between p-3 rounded-2xl cursor-pointer hover:bg-blue-600/15 border ${state.isDark ? 'border-white/5' : 'border-slate-200'} transition-all" data-chat-id="${c.id}">
-            <span class="font-semibold text-xs truncate">${c.is_group ? c.name : (c.other_participants ? getContactDisplayName(c.other_participants[0]) : 'Chat')}</span>
+            <span class="font-semibold text-xs truncate">${c.is_self ? `${state.user?.display_name || 'You'} (You)` : (c.is_group ? c.name : (c.other_participants ? getContactDisplayName(c.other_participants[0]) : 'Chat'))}</span>
             <span class="mdi mdi-send text-blue-500 text-base"></span>
           </div>
         `).join('')}
@@ -1287,16 +1412,19 @@ function renderLightbox() {
 }
 
 // ============================================================
-// ============================================================
-// WEBRTC AUDIO CALL ENGINE (Rock Solid & Glitch-Free)
+// WEBRTC AUDIO CALL ENGINE (Full Voice Transmission & ICE)
 // ============================================================
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun.services.mozilla.com' }
-  ]
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:stun.services.mozilla.com' },
+    { urls: 'stun:stun.relay.metered.ca:80' }
+  ],
+  iceCandidatePoolSize: 10
 };
 
 const processedIceCandidates = new Set();
@@ -1305,7 +1433,11 @@ async function startVoiceCall(chatId, receiverId) {
   processedIceCandidates.clear();
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      },
       video: false
     }).catch(err => {
       console.warn('Microphone error:', err);
@@ -1315,16 +1447,23 @@ async function startVoiceCall(chatId, receiverId) {
     state.localStream = stream;
     state.peerConnection = new RTCPeerConnection(rtcConfig);
 
+    // Add audio transceiver for bidirectional routing
+    try {
+      state.peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
+    } catch (e) {}
+
     if (stream) {
       stream.getTracks().forEach(track => state.peerConnection.addTrack(track, stream));
     }
 
     state.peerConnection.ontrack = (event) => {
-      console.log('[WebRTC] Received remote audio stream:', event.streams[0]);
+      console.log('[WebRTC] Remote audio stream received:', event.streams[0]);
       const audioEl = document.getElementById('remote-audio');
       if (audioEl && event.streams[0]) {
+        audioEl.muted = false;
+        audioEl.volume = 1.0;
         audioEl.srcObject = event.streams[0];
-        audioEl.play().catch(e => console.warn('Audio auto-play policy:', e));
+        audioEl.play().catch(e => console.warn('Audio autoplay gesture required:', e));
       }
     };
 
@@ -1337,7 +1476,10 @@ async function startVoiceCall(chatId, receiverId) {
       }
     };
 
-    const offer = await state.peerConnection.createOffer();
+    const offer = await state.peerConnection.createOffer({
+      offerToReceiveAudio: true,
+      voiceActivityDetection: true
+    });
     await state.peerConnection.setLocalDescription(offer);
 
     const data = await API.request('/calls/initiate', {
@@ -1359,7 +1501,11 @@ async function answerVoiceCall() {
   processedIceCandidates.clear();
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      },
       video: false
     }).catch(err => {
       console.warn('Microphone error:', err);
@@ -1369,16 +1515,22 @@ async function answerVoiceCall() {
     state.localStream = stream;
     state.peerConnection = new RTCPeerConnection(rtcConfig);
 
+    try {
+      state.peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
+    } catch (e) {}
+
     if (stream) {
       stream.getTracks().forEach(track => state.peerConnection.addTrack(track, stream));
     }
 
     state.peerConnection.ontrack = (event) => {
-      console.log('[WebRTC] Received remote audio stream:', event.streams[0]);
+      console.log('[WebRTC] Remote audio stream received:', event.streams[0]);
       const audioEl = document.getElementById('remote-audio');
       if (audioEl && event.streams[0]) {
+        audioEl.muted = false;
+        audioEl.volume = 1.0;
         audioEl.srcObject = event.streams[0];
-        audioEl.play().catch(e => console.warn('Audio auto-play policy:', e));
+        audioEl.play().catch(e => console.warn('Audio autoplay gesture required:', e));
       }
     };
 
@@ -1395,7 +1547,9 @@ async function answerVoiceCall() {
       await state.peerConnection.setRemoteDescription(new RTCSessionDescription(state.activeCall.sdp_offer));
     }
 
-    const answer = await state.peerConnection.createAnswer();
+    const answer = await state.peerConnection.createAnswer({
+      offerToReceiveAudio: true
+    });
     await state.peerConnection.setLocalDescription(answer);
 
     const data = await API.request(`/calls/answer/${state.activeCall.id}`, {
@@ -1404,6 +1558,7 @@ async function answerVoiceCall() {
     });
 
     state.activeCall = data.call;
+    stopRingtoneSound();
     startCallTimer();
     renderCallOverlay();
     startCallPolling();
@@ -1421,6 +1576,7 @@ async function endVoiceCall() {
 }
 
 function cleanupCallState() {
+  stopRingtoneSound();
   if (state.localStream) {
     state.localStream.getTracks().forEach(t => t.stop());
     state.localStream = null;
@@ -1480,6 +1636,7 @@ function startCallPolling() {
       // If transition from 'ringing' to 'accepted'
       if (state.activeCall.status === 'ringing' && serverCall.status === 'accepted') {
         state.activeCall = serverCall;
+        stopRingtoneSound();
         if (serverCall.caller_id === state.user?.id && serverCall.sdp_answer) {
           if (state.peerConnection && state.peerConnection.signalingState !== 'stable') {
             await state.peerConnection.setRemoteDescription(new RTCSessionDescription(serverCall.sdp_answer)).catch(() => {});
@@ -1526,6 +1683,15 @@ async function loadInitialData() {
     state.chats = chatsData.chats || [];
     state.aliases = aliasesData.aliases || {};
     state.blockedUserIds = new Set((blocksData.blockedUsers || []).map(b => b.blocked_id));
+
+    // Default to self chat if no active chat selected
+    if (!state.activeChatId && state.chats.length > 0) {
+      const selfChat = state.chats.find(c => c.is_self);
+      if (selfChat) {
+        state.activeChatId = selfChat.id;
+        localStorage.setItem('logsapp_active_chat_id', selfChat.id);
+      }
+    }
 
     if (state.activeChatId) {
       await loadMessages(state.activeChatId);
@@ -1694,7 +1860,7 @@ function bindMainEvents() {
   document.getElementById('menu-report-user')?.addEventListener('click', () => {
     state.showChatMenu = false;
     const activeChat = state.chats.find(c => c.id === state.activeChatId);
-    const other = !activeChat?.is_group && activeChat?.other_participants ? activeChat.other_participants[0] : null;
+    const other = !activeChat?.is_group && !activeChat?.is_self && activeChat?.other_participants ? activeChat.other_participants[0] : null;
     if (other) {
       state.showReportModal = other;
       render();
@@ -1728,7 +1894,7 @@ function bindMainEvents() {
   document.getElementById('menu-toggle-block')?.addEventListener('click', async () => {
     state.showChatMenu = false;
     const activeChat = state.chats.find(c => c.id === state.activeChatId);
-    const other = !activeChat?.is_group && activeChat?.other_participants ? activeChat.other_participants[0] : null;
+    const other = !activeChat?.is_group && !activeChat?.is_self && activeChat?.other_participants ? activeChat.other_participants[0] : null;
     if (!other) return;
 
     const isBlocked = state.blockedUserIds.has(other.id);
@@ -1752,7 +1918,7 @@ function bindMainEvents() {
   document.getElementById('menu-set-alias')?.addEventListener('click', () => {
     state.showChatMenu = false;
     const activeChat = state.chats.find(c => c.id === state.activeChatId);
-    const other = !activeChat?.is_group && activeChat?.other_participants ? activeChat.other_participants[0] : null;
+    const other = !activeChat?.is_group && !activeChat?.is_self && activeChat?.other_participants ? activeChat.other_participants[0] : null;
     if (other) {
       state.showAliasModal = other;
       render();
@@ -1810,7 +1976,7 @@ function bindMainEvents() {
   // Start Voice Call
   document.getElementById('btn-start-call')?.addEventListener('click', () => {
     const activeChat = state.chats.find(c => c.id === state.activeChatId);
-    const other = !activeChat?.is_group && activeChat?.other_participants ? activeChat.other_participants[0] : null;
+    const other = !activeChat?.is_group && !activeChat?.is_self && activeChat?.other_participants ? activeChat.other_participants[0] : null;
     if (other) {
       startVoiceCall(state.activeChatId, other.id);
     }
@@ -2169,7 +2335,6 @@ setInterval(async () => {
         startCallPolling();
       }
     } else if (state.activeCall && state.activeCall.status === 'ringing') {
-      // If ringing call was cancelled by caller
       cleanupCallState();
     }
   } catch (e) {}

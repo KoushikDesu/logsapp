@@ -10,10 +10,49 @@ function generateGroupRoyalId(): string {
   return String(Math.floor(Math.random() * (max - min + 1)) + min);
 }
 
-// Get all chats for current user (1-on-1 and groups)
+// Ensure Self-Chat ("Message Yourself (You)") exists for the user
+async function ensureSelfChat(userId: string): Promise<string> {
+  const selfCheck = await query(`
+    SELECT c.id FROM chats c
+    JOIN chat_participants cp ON cp.chat_id = c.id
+    WHERE c.is_group = FALSE
+    GROUP BY c.id
+    HAVING COUNT(cp.user_id) = 1 AND MAX(cp.user_id) = $1
+    LIMIT 1
+  `, [userId]);
+
+  if (selfCheck.rows.length > 0) {
+    return selfCheck.rows[0].id;
+  }
+
+  const newChat = await query(
+    `INSERT INTO chats (is_group, created_by, max_storage_bytes)
+     VALUES (FALSE, $1, 1073741824)
+     RETURNING id`,
+    [userId]
+  );
+  const chatId = newChat.rows[0].id;
+
+  await query(
+    `INSERT INTO chat_participants (chat_id, user_id, role)
+     VALUES ($1, $2, 'owner')`,
+    [chatId, userId]
+  );
+
+  return chatId;
+}
+
+// Get all chats for current user (Self-chat, 1-on-1, and groups)
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // Ensure Self-chat is initialized
+    await ensureSelfChat(userId);
 
     const chatsRes = await query(
       `SELECT 
@@ -31,6 +70,8 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
          c.updated_at,
          cp.role as user_role,
          cp.last_read_at,
+         -- Check if this is a self-chat (Message yourself)
+         ((SELECT COUNT(*) FROM chat_participants cpSelf WHERE cpSelf.chat_id = c.id) = 1 AND c.is_group = FALSE) as is_self,
          -- Get latest message
          (
            SELECT json_build_object(
@@ -78,7 +119,10 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
          )::int as participant_count
        FROM chats c
        JOIN chat_participants cp ON cp.chat_id = c.id AND cp.user_id = $1
-       ORDER BY c.updated_at DESC`,
+       ORDER BY 
+         -- Keep self-chat prioritized, followed by latest updated chats
+         ((SELECT COUNT(*) FROM chat_participants cpSelf WHERE cpSelf.chat_id = c.id) = 1 AND c.is_group = FALSE) DESC,
+         c.updated_at DESC`,
       [userId]
     );
 
@@ -156,7 +200,7 @@ router.post('/group/join/:groupId', authenticateToken, async (req: AuthRequest, 
   }
 });
 
-// Create or get 1-on-1 direct chat with a user
+// Create or get 1-on-1 direct chat with a user (supports self chat)
 router.post('/direct', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -167,8 +211,10 @@ router.post('/direct', authenticateToken, async (req: AuthRequest, res: Response
       return;
     }
 
+    // If starting chat with self
     if (userId === targetUserId) {
-      res.status(400).json({ error: 'Cannot start a direct chat with yourself' });
+      const selfChatId = await ensureSelfChat(userId!);
+      res.json({ chatId: selfChatId, isNew: false, isSelf: true });
       return;
     }
 
@@ -274,7 +320,6 @@ router.post('/group', authenticateToken, async (req: AuthRequest, res: Response)
 router.post('/group/:groupId/members', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const groupId = req.params.groupId as string;
-    const userId = req.user?.id;
     const { userIds } = req.body;
 
     if (!Array.isArray(userIds) || userIds.length === 0) {
@@ -282,7 +327,6 @@ router.post('/group/:groupId/members', authenticateToken, async (req: AuthReques
       return;
     }
 
-    // Check if group exists and user is admin or if public
     const groupRes = await query('SELECT is_public, created_by FROM chats WHERE id = $1 AND is_group = true', [groupId]);
     if (groupRes.rows.length === 0) {
       res.status(404).json({ error: 'Group not found' });
