@@ -201,38 +201,67 @@ function showToast(msg, type = 'info') {
 }
 
 // ============================================================
-// WEBAUDIO RINGTONE CHIME SYNTHESIZER
+// WEBAUDIO RINGTONE CHIME SYNTHESIZER (Autoplay-Proof)
 // ============================================================
 let ringtoneInterval = null;
-let ringtoneAudioCtx = null;
+let sharedAudioCtx = null;
+
+function getSharedAudioContext() {
+  try {
+    if (!sharedAudioCtx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) sharedAudioCtx = new AudioCtx();
+    }
+    if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+  } catch (e) {}
+  return sharedAudioCtx;
+}
+
+// Automatically unlock audio upon first user gesture
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    getSharedAudioContext();
+    const audioEl = document.getElementById('remote-audio');
+    if (audioEl && typeof audioEl.play === 'function') {
+      audioEl.muted = false;
+      audioEl.volume = 1.0;
+    }
+  };
+  window.addEventListener('click', unlock, { passive: true });
+  window.addEventListener('touchstart', unlock, { passive: true });
+  window.addEventListener('keydown', unlock, { passive: true });
+}
 
 function playRingtoneSound() {
   stopRingtoneSound();
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    ringtoneAudioCtx = new AudioCtx();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
 
     function triggerChime() {
-      if (!ringtoneAudioCtx || ringtoneAudioCtx.state === 'closed') return;
-      if (ringtoneAudioCtx.state === 'suspended') ringtoneAudioCtx.resume();
+      if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') return;
+      if (sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume().catch(() => {});
+      }
 
-      const now = ringtoneAudioCtx.currentTime;
-      const osc1 = ringtoneAudioCtx.createOscillator();
-      const osc2 = ringtoneAudioCtx.createOscillator();
-      const gain = ringtoneAudioCtx.createGain();
+      const now = sharedAudioCtx.currentTime;
+      const osc1 = sharedAudioCtx.createOscillator();
+      const osc2 = sharedAudioCtx.createOscillator();
+      const gain = sharedAudioCtx.createGain();
 
       osc1.type = 'sine';
       osc2.type = 'sine';
-      osc1.frequency.setValueAtTime(480, now);
-      osc2.frequency.setValueAtTime(440, now);
+      osc1.frequency.setValueAtTime(440, now);
+      osc2.frequency.setValueAtTime(480, now);
 
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
 
       osc1.connect(gain);
       osc2.connect(gain);
-      gain.connect(ringtoneAudioCtx.destination);
+      gain.connect(sharedAudioCtx.destination);
 
       osc1.start(now);
       osc2.start(now);
@@ -241,17 +270,13 @@ function playRingtoneSound() {
     }
 
     triggerChime();
-    ringtoneInterval = setInterval(triggerChime, 2600);
+    ringtoneInterval = setInterval(triggerChime, 2400);
   } catch (e) {}
 }
 
 function stopRingtoneSound() {
   clearInterval(ringtoneInterval);
   ringtoneInterval = null;
-  if (ringtoneAudioCtx) {
-    try { ringtoneAudioCtx.close(); } catch (e) {}
-    ringtoneAudioCtx = null;
-  }
 }
 
 // Master Render (Renders #app without flickering call timers)
@@ -2370,19 +2395,17 @@ function bindMainEvents() {
 setInterval(async () => {
   if (!state.token) return;
 
-  // 1. Check for any global incoming call across all chats
-  try {
-    const callRes = await API.request('/calls/incoming').catch(() => ({}));
-    if (callRes.activeCall) {
-      if (!state.activeCall) {
+  // 1. Check for incoming calls (for receiver only — the caller manages their own state via startCallPolling)
+  if (!state.activeCall) {
+    try {
+      const callRes = await API.request('/calls/incoming').catch(() => ({}));
+      if (callRes.activeCall && callRes.activeCall.status === 'ringing') {
         state.activeCall = callRes.activeCall;
         renderCallOverlay();
         startCallPolling();
       }
-    } else if (state.activeCall && state.activeCall.status === 'ringing') {
-      cleanupCallState();
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
   // 2. Sync Messages for active chat
   if (state.activeChatId) {

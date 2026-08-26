@@ -8,8 +8,12 @@ const router = Router();
 router.get('/incoming', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
-    // Find any active/ringing call in user's chats created in the last 60 seconds
+    // Find any active ringing call targeting current user
     const callRes = await query(`
       SELECT c.*, 
              u1.display_name as caller_name, u1.username as caller_username, u1.avatar_url as caller_avatar, u1.royal_id as caller_royal_id,
@@ -18,8 +22,10 @@ router.get('/incoming', authenticateToken, async (req: AuthRequest, res: Respons
       JOIN chat_participants cp ON cp.chat_id = c.chat_id AND cp.user_id = $1
       JOIN users u1 ON u1.id = c.caller_id
       LEFT JOIN users u2 ON u2.id = c.receiver_id
-      WHERE c.status IN ('ringing', 'accepted')
-        AND c.created_at > NOW() - INTERVAL '2 minutes'
+      WHERE c.caller_id != $1
+        AND (c.receiver_id = $1 OR c.receiver_id IS NULL)
+        AND c.status = 'ringing'
+        AND c.created_at > NOW() - INTERVAL '60 seconds'
       ORDER BY c.created_at DESC
       LIMIT 1
     `, [userId]);
@@ -100,7 +106,6 @@ router.get('/status/:chatId', authenticateToken, async (req: AuthRequest, res: R
       JOIN users u1 ON u1.id = c.caller_id
       LEFT JOIN users u2 ON u2.id = c.receiver_id
       WHERE c.chat_id = $1 AND c.status IN ('ringing', 'accepted')
-        AND c.created_at > NOW() - INTERVAL '5 minutes'
       ORDER BY c.created_at DESC
       LIMIT 1
     `, [chatId]);
@@ -116,7 +121,7 @@ router.get('/status/:chatId', authenticateToken, async (req: AuthRequest, res: R
   }
 });
 
-// Answer Call (with SDP answer)
+// Answer Call (with SDP Answer)
 router.post('/answer/:callId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const callId = req.params.callId as string;
