@@ -1266,6 +1266,20 @@ function renderProfileModal() {
           </div>
         ` : ''}
 
+        <!-- Edit Profile Name & Password Form -->
+        <form id="edit-profile-form" class="space-y-3 p-4 ${state.isDark ? 'bg-slate-950/60 border-white/10' : 'bg-slate-100/80 border-slate-200'} rounded-3xl border backdrop-blur-md">
+          <h4 class="text-xs font-bold uppercase tracking-wider ${state.isDark ? 'text-slate-300' : 'text-slate-700'}">Edit Name & Password</h4>
+          <div>
+            <label class="block text-[11px] font-semibold ${state.isDark ? 'text-slate-400' : 'text-slate-600'} mb-1">Display Name</label>
+            <input type="text" id="edit-profile-name" value="${state.user?.display_name || ''}" required class="w-full px-3.5 py-2 ${state.isDark ? 'bg-slate-900 border-white/10 text-slate-100' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl text-xs focus:outline-none focus:border-blue-500 transition-all" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold ${state.isDark ? 'text-slate-400' : 'text-slate-600'} mb-1">New Password (Leave blank to keep unchanged)</label>
+            <input type="password" id="edit-profile-pass" placeholder="••••••••" class="w-full px-3.5 py-2 ${state.isDark ? 'bg-slate-900 border-white/10 text-slate-100' : 'bg-white border-slate-200 text-slate-900'} border rounded-2xl text-xs focus:outline-none focus:border-blue-500 transition-all" />
+          </div>
+          <button type="submit" id="btn-save-profile" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold shadow-lg shadow-blue-500/25 transition-all">Save Profile Changes</button>
+        </form>
+
         <div class="p-3.5 ${state.isDark ? 'bg-slate-950/60 border-white/10' : 'bg-slate-100/80 border-slate-200'} rounded-2xl border space-y-1 text-xs backdrop-blur-md">
           <div class="flex justify-between">
             <span class="${state.isDark ? 'text-slate-400' : 'text-slate-600'} font-medium">Storage Usage</span>
@@ -1275,7 +1289,7 @@ function renderProfileModal() {
 
         <div class="pt-2 flex justify-between">
           <button id="btn-logout" class="px-4 py-2.5 bg-red-500/15 hover:bg-red-500/25 text-red-500 border border-red-500/30 rounded-2xl text-xs font-semibold transition-all">Logout</button>
-          <button id="btn-profile-done" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-2xl text-xs shadow-lg shadow-blue-500/25 border border-white/10 transition-all">Done</button>
+          <button id="btn-profile-done" class="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-2xl text-xs shadow transition-all">Close</button>
         </div>
       </div>
     </div>
@@ -1732,6 +1746,37 @@ function bindMainEvents() {
   document.getElementById('btn-open-profile')?.addEventListener('click', () => { state.showProfile = true; render(); });
   document.getElementById('btn-close-profile')?.addEventListener('click', () => { state.showProfile = false; render(); });
   document.getElementById('btn-profile-done')?.addEventListener('click', () => { state.showProfile = false; render(); });
+
+  document.getElementById('edit-profile-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const displayName = document.getElementById('edit-profile-name').value.trim();
+    const newPassword = document.getElementById('edit-profile-pass').value;
+
+    if (!displayName) {
+      showToast('Display Name cannot be empty', 'error');
+      return;
+    }
+
+    const payload = { display_name: displayName };
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+      }
+      payload.new_password = newPassword;
+    }
+
+    try {
+      const res = await API.request('/auth/me', { method: 'PUT', body: JSON.stringify(payload) });
+      state.user = res.user;
+      localStorage.setItem('logsapp_user', JSON.stringify(res.user));
+      showToast('Name & profile updated successfully! 🎉', 'success');
+      await loadChats();
+      render();
+    } catch (err) {
+      showToast(err.message || 'Failed to update profile', 'error');
+    }
+  });
 
   // Admin Dashboard
   document.getElementById('btn-open-admin')?.addEventListener('click', async () => {

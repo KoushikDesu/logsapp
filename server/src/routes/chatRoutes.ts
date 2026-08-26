@@ -17,7 +17,7 @@ async function ensureSelfChat(userId: string): Promise<string> {
     JOIN chat_participants cp ON cp.chat_id = c.id
     WHERE c.is_group = FALSE
     GROUP BY c.id
-    HAVING COUNT(cp.user_id) = 1 AND MAX(cp.user_id) = $1
+    HAVING COUNT(cp.user_id) = 1 AND bool_and(cp.user_id = $1)
     LIMIT 1
   `, [userId]);
 
