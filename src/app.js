@@ -1287,19 +1287,31 @@ function renderLightbox() {
 }
 
 // ============================================================
+// ============================================================
 // WEBRTC AUDIO CALL ENGINE (Rock Solid & Glitch-Free)
 // ============================================================
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.services.mozilla.com' }
   ]
 };
 
+const processedIceCandidates = new Set();
+
 async function startVoiceCall(chatId, receiverId) {
+  processedIceCandidates.clear();
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }).catch(() => null);
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false
+    }).catch(err => {
+      console.warn('Microphone error:', err);
+      return null;
+    });
+
     state.localStream = stream;
     state.peerConnection = new RTCPeerConnection(rtcConfig);
 
@@ -1308,9 +1320,21 @@ async function startVoiceCall(chatId, receiverId) {
     }
 
     state.peerConnection.ontrack = (event) => {
-      const audio = new Audio();
-      audio.srcObject = event.streams[0];
-      audio.play().catch(() => {});
+      console.log('[WebRTC] Received remote audio stream:', event.streams[0]);
+      const audioEl = document.getElementById('remote-audio');
+      if (audioEl && event.streams[0]) {
+        audioEl.srcObject = event.streams[0];
+        audioEl.play().catch(e => console.warn('Audio auto-play policy:', e));
+      }
+    };
+
+    state.peerConnection.onicecandidate = (event) => {
+      if (event.candidate && state.activeCall?.id) {
+        API.request(`/calls/ice-candidate/${state.activeCall.id}`, {
+          method: 'POST',
+          body: JSON.stringify({ candidate: event.candidate })
+        }).catch(() => {});
+      }
     };
 
     const offer = await state.peerConnection.createOffer();
@@ -1332,8 +1356,16 @@ async function startVoiceCall(chatId, receiverId) {
 
 async function answerVoiceCall() {
   if (!state.activeCall) return;
+  processedIceCandidates.clear();
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }).catch(() => null);
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false
+    }).catch(err => {
+      console.warn('Microphone error:', err);
+      return null;
+    });
+
     state.localStream = stream;
     state.peerConnection = new RTCPeerConnection(rtcConfig);
 
@@ -1342,9 +1374,21 @@ async function answerVoiceCall() {
     }
 
     state.peerConnection.ontrack = (event) => {
-      const audio = new Audio();
-      audio.srcObject = event.streams[0];
-      audio.play().catch(() => {});
+      console.log('[WebRTC] Received remote audio stream:', event.streams[0]);
+      const audioEl = document.getElementById('remote-audio');
+      if (audioEl && event.streams[0]) {
+        audioEl.srcObject = event.streams[0];
+        audioEl.play().catch(e => console.warn('Audio auto-play policy:', e));
+      }
+    };
+
+    state.peerConnection.onicecandidate = (event) => {
+      if (event.candidate && state.activeCall?.id) {
+        API.request(`/calls/ice-candidate/${state.activeCall.id}`, {
+          method: 'POST',
+          body: JSON.stringify({ candidate: event.candidate })
+        }).catch(() => {});
+      }
     };
 
     if (state.activeCall.sdp_offer) {
@@ -1385,6 +1429,11 @@ function cleanupCallState() {
     state.peerConnection.close();
     state.peerConnection = null;
   }
+  const audioEl = document.getElementById('remote-audio');
+  if (audioEl) {
+    audioEl.srcObject = null;
+  }
+  processedIceCandidates.clear();
   clearInterval(state.callTimerInterval);
   clearInterval(state.callPollInterval);
   state.callTimerInterval = null;
@@ -1409,14 +1458,18 @@ function startCallTimer() {
   }, 1000);
 }
 
-// Rapid 1.2s Call State Poller (Ensures instant connection transition)
+// Rapid 1.2s Call State & ICE Candidate Poller
 function startCallPolling() {
   clearInterval(state.callPollInterval);
   state.callPollInterval = setInterval(async () => {
     if (!state.activeCall) return;
     try {
-      const data = await API.request(`/calls/status/${state.activeCall.chat_id}`);
-      const serverCall = data.activeCall;
+      const [statusRes, iceRes] = await Promise.all([
+        API.request(`/calls/status/${state.activeCall.chat_id}`).catch(() => ({})),
+        API.request(`/calls/ice-candidates/${state.activeCall.id}`).catch(() => ({ candidates: [] }))
+      ]);
+
+      const serverCall = statusRes.activeCall;
 
       if (!serverCall || serverCall.status === 'ended' || serverCall.status === 'rejected') {
         showToast('Call ended', 'info');
@@ -1435,6 +1488,19 @@ function startCallPolling() {
         startCallTimer();
         renderCallOverlay();
         showToast('Call connected! 🎙️', 'success');
+      }
+
+      // Ingest remote ICE candidates
+      if (iceRes.candidates && state.peerConnection && state.peerConnection.remoteDescription) {
+        for (const cand of iceRes.candidates) {
+          const candKey = JSON.stringify(cand);
+          if (!processedIceCandidates.has(candKey)) {
+            processedIceCandidates.add(candKey);
+            try {
+              await state.peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+            } catch (err) {}
+          }
+        }
       }
     } catch (e) {}
   }, 1200);

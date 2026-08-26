@@ -64,8 +64,8 @@ router.post('/initiate', authenticateToken, async (req: AuthRequest, res: Respon
     `, [chatId]);
 
     const callRes = await query(`
-      INSERT INTO calls (chat_id, caller_id, receiver_id, status, sdp_offer)
-      VALUES ($1, $2, $3, 'ringing', $4)
+      INSERT INTO calls (chat_id, caller_id, receiver_id, status, sdp_offer, ice_candidates)
+      VALUES ($1, $2, $3, 'ringing', $4, '[]'::jsonb)
       RETURNING *
     `, [chatId, callerId, receiverId || null, JSON.stringify(sdpOffer)]);
 
@@ -154,17 +154,46 @@ router.post('/answer/:callId', authenticateToken, async (req: AuthRequest, res: 
 router.post('/ice-candidate/:callId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const callId = req.params.callId as string;
-    const { candidate, sender } = req.body;
+    const userId = req.user?.id;
+    const { candidate } = req.body;
+
+    if (!candidate) {
+      res.json({ success: true });
+      return;
+    }
 
     await query(`
       UPDATE calls
-      SET ice_candidates = ice_candidates || $1::jsonb
+      SET ice_candidates = COALESCE(ice_candidates, '[]'::jsonb) || $1::jsonb
       WHERE id = $2
-    `, [JSON.stringify([{ candidate, sender, timestamp: Date.now() }]), callId]);
+    `, [JSON.stringify([{ candidate, senderId: userId, timestamp: Date.now() }]), callId]);
 
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to add ICE candidate' });
+  }
+});
+
+// Get ICE Candidates sent by other peer
+router.get('/ice-candidates/:callId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const callId = req.params.callId as string;
+    const userId = req.user?.id;
+
+    const callRes = await query('SELECT ice_candidates FROM calls WHERE id = $1', [callId]);
+    if (callRes.rows.length === 0) {
+      res.json({ candidates: [] });
+      return;
+    }
+
+    const allCandidates = callRes.rows[0].ice_candidates || [];
+    const otherCandidates = allCandidates
+      .filter((c: any) => c.senderId !== userId && c.candidate)
+      .map((c: any) => c.candidate);
+
+    res.json({ candidates: otherCandidates });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch ICE candidates' });
   }
 });
 
