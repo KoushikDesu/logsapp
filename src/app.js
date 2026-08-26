@@ -1,7 +1,8 @@
 // ============================================================
 // LogsApp 2.0 — Enterprise Web Messenger & 1GB Bridge
-// Features: Admin Dashboard, Reports & Blocks, WebRTC Voice Calls,
-// Public/Private Groups, Custom Nicknames, Forward/Delete/Clear, Direct Download
+// Features: Glitch-Free WebRTC Audio Calls, Admin Dashboard,
+// Reports & Blocks, Public/Private Groups, Custom Nicknames,
+// Forward/Delete/Clear, Direct Download, Deterministic Avatars
 // ============================================================
 
 // Brand Logo SVG
@@ -132,25 +133,26 @@ const state = {
   showServerConfig: false,
   showAvatarGrid: false,
   showAdminModal: false,
-  adminTab: 'overview', // 'overview' | 'reports' | 'users'
+  adminTab: 'overview',
   adminStats: null,
   adminReports: [],
   adminUsers: [],
   
   // Feature Modals
-  showReportModal: null, // target user object
-  showAliasModal: null, // target contact object
-  showForwardModal: null, // message object to forward
+  showReportModal: null,
+  showAliasModal: null,
+  showForwardModal: null,
   showChatMenu: false,
   lightboxMedia: null,
 
-  // WebRTC Audio Call State
-  activeCall: null, // Active call object from server
+  // WebRTC Audio Call Engine State
+  activeCall: null,
   peerConnection: null,
   localStream: null,
   isMuted: false,
   callDuration: 0,
-  callTimerInterval: null
+  callTimerInterval: null,
+  callPollInterval: null
 };
 
 // Force Direct File Download Function
@@ -195,7 +197,7 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
-// Master Render
+// Master Render (Renders #app without flickering call timers)
 function render() {
   const root = document.getElementById('app');
   if (!root) return;
@@ -209,6 +211,7 @@ function render() {
   if (!state.user || !state.token) {
     root.innerHTML = renderAuthScreen();
     bindAuthEvents();
+    renderCallOverlay();
     return;
   }
 
@@ -227,9 +230,6 @@ function render() {
       </div>
     </div>
 
-    <!-- Active Call Floating Banner / Overlay -->
-    ${state.activeCall ? renderCallOverlay() : ''}
-
     <!-- Modals -->
     ${state.showProfile ? renderProfileModal() : ''}
     ${state.showGroupModal ? renderGroupModal() : ''}
@@ -243,6 +243,7 @@ function render() {
   `;
 
   bindMainEvents();
+  renderCallOverlay();
 }
 
 // ============================================================
@@ -750,21 +751,27 @@ function renderMessageBubble(msg, isMe) {
 }
 
 // ============================================================
-// WEBRTC AUDIO CALLING OVERLAY & BANNER
+// ISOLATED WEBRTC AUDIO CALL OVERLAY (Zero Glitches)
 // ============================================================
 function renderCallOverlay() {
-  const call = state.activeCall;
-  if (!call) return '';
+  const container = document.getElementById('call-container');
+  if (!container) return;
 
-  const isCaller = call.caller_id === state.user.id;
+  const call = state.activeCall;
+  if (!call) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const isCaller = call.caller_id === state.user?.id;
   const otherName = isCaller ? (call.receiver_name || 'Contact') : (call.caller_name || 'Caller');
   const otherAvatar = isCaller ? (call.receiver_avatar || getDeterministicAnimeAvatar(call.receiver_id).url) : (call.caller_avatar || getDeterministicAnimeAvatar(call.caller_id).url);
 
   if (call.status === 'ringing') {
     if (!isCaller) {
       // Incoming Call Ringing Banner
-      return `
-      <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md p-4 glass-card-dark rounded-3xl shadow-2xl border border-blue-500/40 call-pulse flex items-center justify-between animate-in fade-in">
+      container.innerHTML = `
+      <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md p-4 glass-card-dark rounded-3xl shadow-2xl border border-blue-500/40 call-pulse flex items-center justify-between pointer-events-auto animate-in fade-in">
         <div class="flex items-center gap-3 min-w-0">
           <img src="${otherAvatar}" class="w-12 h-12 rounded-2xl object-cover border-2 border-emerald-500" />
           <div>
@@ -773,14 +780,14 @@ function renderCallOverlay() {
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button id="btn-accept-call" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-xs flex items-center gap-1 shadow-lg shadow-emerald-500/30"><span class="mdi mdi-phone"></span> Accept</button>
-          <button id="btn-decline-call" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-bold text-xs flex items-center gap-1 shadow-lg shadow-red-500/30"><span class="mdi mdi-phone-hangup"></span> Decline</button>
+          <button id="btn-accept-call" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-xs flex items-center gap-1 shadow-lg shadow-emerald-500/30 transition-all"><span class="mdi mdi-phone"></span> Accept</button>
+          <button id="btn-decline-call" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-bold text-xs flex items-center gap-1 shadow-lg shadow-red-500/30 transition-all"><span class="mdi mdi-phone-hangup"></span> Decline</button>
         </div>
       </div>`;
     } else {
-      // Outgoing Call Calling Banner
-      return `
-      <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md p-4 glass-card-dark rounded-3xl shadow-2xl border border-blue-500/40 flex items-center justify-between animate-in fade-in">
+      // Outgoing Call Ringing Banner
+      container.innerHTML = `
+      <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-md p-4 glass-card-dark rounded-3xl shadow-2xl border border-blue-500/40 flex items-center justify-between pointer-events-auto animate-in fade-in">
         <div class="flex items-center gap-3 min-w-0">
           <img src="${otherAvatar}" class="w-12 h-12 rounded-2xl object-cover border-2 border-blue-500 animate-pulse" />
           <div>
@@ -788,31 +795,43 @@ function renderCallOverlay() {
             <p class="text-xs text-blue-400 font-semibold">Calling...</p>
           </div>
         </div>
-        <button id="btn-hangup-call" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-bold text-xs flex items-center gap-1"><span class="mdi mdi-phone-hangup"></span> Cancel</button>
+        <button id="btn-hangup-call" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-bold text-xs flex items-center gap-1 transition-all"><span class="mdi mdi-phone-hangup"></span> Cancel</button>
       </div>`;
     }
+  } else if (call.status === 'accepted') {
+    // Active In-Call Floating Widget
+    const minutes = Math.floor(state.callDuration / 60).toString().padStart(2, '0');
+    const seconds = (state.callDuration % 60).toString().padStart(2, '0');
+
+    container.innerHTML = `
+    <div class="fixed bottom-6 right-6 z-50 p-4 glass-card-dark rounded-3xl shadow-2xl border border-emerald-500/40 flex items-center gap-4 pointer-events-auto animate-in fade-in">
+      <img src="${otherAvatar}" class="w-10 h-10 rounded-2xl object-cover border-2 border-emerald-500" />
+      <div>
+        <h4 class="font-bold text-xs text-white">${otherName}</h4>
+        <span id="call-timer-text" class="text-[11px] font-mono text-emerald-400 font-bold">${minutes}:${seconds}</span>
+      </div>
+      <div class="flex items-center gap-1.5 ml-2">
+        <button id="btn-toggle-mute" class="p-2.5 ${state.isMuted ? 'bg-red-500/30 text-red-400' : 'bg-white/10 text-white'} hover:bg-white/20 rounded-2xl transition-all" title="${state.isMuted ? 'Unmute' : 'Mute'}">
+          <span class="mdi ${state.isMuted ? 'mdi-microphone-off' : 'mdi-microphone'}"></span>
+        </button>
+        <button id="btn-hangup-call" class="p-2.5 bg-red-600 hover:bg-red-500 text-white rounded-2xl transition-all" title="End Call">
+          <span class="mdi mdi-phone-hangup"></span>
+        </button>
+      </div>
+    </div>`;
   }
 
-  // Active Accepted Call Floating Overlay
-  const minutes = Math.floor(state.callDuration / 60).toString().padStart(2, '0');
-  const seconds = (state.callDuration % 60).toString().padStart(2, '0');
-
-  return `
-  <div class="fixed bottom-6 right-6 z-50 p-4 glass-card-dark rounded-3xl shadow-2xl border border-emerald-500/40 flex items-center gap-4 animate-in fade-in">
-    <img src="${otherAvatar}" class="w-10 h-10 rounded-2xl object-cover border-2 border-emerald-500" />
-    <div>
-      <h4 class="font-bold text-xs text-white">${otherName}</h4>
-      <span class="text-[11px] font-mono text-emerald-400 font-bold">${minutes}:${seconds}</span>
-    </div>
-    <div class="flex items-center gap-1.5 ml-2">
-      <button id="btn-toggle-mute" class="p-2.5 ${state.isMuted ? 'bg-red-500/30 text-red-400' : 'bg-white/10 text-white'} hover:bg-white/20 rounded-2xl transition-all" title="${state.isMuted ? 'Unmute' : 'Mute'}">
-        <span class="mdi ${state.isMuted ? 'mdi-microphone-off' : 'mdi-microphone'}"></span>
-      </button>
-      <button id="btn-hangup-call" class="p-2.5 bg-red-600 hover:bg-red-500 text-white rounded-2xl transition-all" title="End Call">
-        <span class="mdi mdi-phone-hangup"></span>
-      </button>
-    </div>
-  </div>`;
+  // Bind Call Event Buttons
+  document.getElementById('btn-accept-call')?.addEventListener('click', () => answerVoiceCall());
+  document.getElementById('btn-decline-call')?.addEventListener('click', () => endVoiceCall());
+  document.getElementById('btn-hangup-call')?.addEventListener('click', () => endVoiceCall());
+  document.getElementById('btn-toggle-mute')?.addEventListener('click', () => {
+    if (state.localStream) {
+      state.isMuted = !state.isMuted;
+      state.localStream.getAudioTracks().forEach(t => { t.enabled = !state.isMuted; });
+      renderCallOverlay();
+    }
+  });
 }
 
 // ============================================================
@@ -1236,11 +1255,11 @@ function renderCLIModal() {
         <div class="p-4 ${state.isDark ? 'bg-blue-950/40 border-blue-500/30' : 'bg-blue-50 border-blue-200'} rounded-2xl border space-y-2 backdrop-blur-md">
           <h4 class="font-bold text-blue-500">🎓 College Lab Commands</h4>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div class="p-3 ${state.isDark ? 'bg-slate-950/70 border-white/10' : 'bg-white border-slate-200 shadow-sm'} rounded-2xl border">
+            <div class="p-3 ${state.isDark ? 'bg-slate-950/70 border-white/10' : 'bg-white border-slate-200 shadow-sm'} rounded-xl border">
               <span class="font-mono text-blue-500 font-bold">logsapp pull @friend</span>
               <p class="text-[11px] ${state.isDark ? 'text-slate-400' : 'text-slate-600'} mt-0.5">Download all shared files straight into your college lab folder.</p>
             </div>
-            <div class="p-3 ${state.isDark ? 'bg-slate-950/70 border-white/10' : 'bg-white border-slate-200 shadow-sm'} rounded-2xl border">
+            <div class="p-3 ${state.isDark ? 'bg-slate-950/70 border-white/10' : 'bg-white border-slate-200 shadow-sm'} rounded-xl border">
               <span class="font-mono text-blue-500 font-bold">logsapp push-dir ./lab_code @friend</span>
               <p class="text-[11px] ${state.isDark ? 'text-slate-400' : 'text-slate-600'} mt-0.5">Zip & upload your assignment folder (up to 1GB).</p>
             </div>
@@ -1268,21 +1287,26 @@ function renderLightbox() {
 }
 
 // ============================================================
-// WEBRTC CALLING ENGINE
+// WEBRTC AUDIO CALL ENGINE (Rock Solid & Glitch-Free)
 // ============================================================
 const rtcConfig = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }
+  ]
 };
 
 async function startVoiceCall(chatId, receiverId) {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }).catch(() => null);
     state.localStream = stream;
     state.peerConnection = new RTCPeerConnection(rtcConfig);
 
-    stream.getTracks().forEach(track => state.peerConnection.addTrack(track, stream));
+    if (stream) {
+      stream.getTracks().forEach(track => state.peerConnection.addTrack(track, stream));
+    }
 
-    // Handle remote stream
     state.peerConnection.ontrack = (event) => {
       const audio = new Audio();
       audio.srcObject = event.streams[0];
@@ -1298,21 +1322,24 @@ async function startVoiceCall(chatId, receiverId) {
     });
 
     state.activeCall = data.call;
-    render();
+    renderCallOverlay();
+    startCallPolling();
     showToast('Calling... 📞', 'info');
   } catch (err) {
-    showToast('Microphone access required for audio calls', 'error');
+    showToast('Could not start call', 'error');
   }
 }
 
 async function answerVoiceCall() {
   if (!state.activeCall) return;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }).catch(() => null);
     state.localStream = stream;
     state.peerConnection = new RTCPeerConnection(rtcConfig);
 
-    stream.getTracks().forEach(track => state.peerConnection.addTrack(track, stream));
+    if (stream) {
+      stream.getTracks().forEach(track => state.peerConnection.addTrack(track, stream));
+    }
 
     state.peerConnection.ontrack = (event) => {
       const audio = new Audio();
@@ -1320,7 +1347,10 @@ async function answerVoiceCall() {
       audio.play().catch(() => {});
     };
 
-    await state.peerConnection.setRemoteDescription(new RTCSessionDescription(state.activeCall.sdp_offer));
+    if (state.activeCall.sdp_offer) {
+      await state.peerConnection.setRemoteDescription(new RTCSessionDescription(state.activeCall.sdp_offer));
+    }
+
     const answer = await state.peerConnection.createAnswer();
     await state.peerConnection.setLocalDescription(answer);
 
@@ -1331,7 +1361,8 @@ async function answerVoiceCall() {
 
     state.activeCall = data.call;
     startCallTimer();
-    render();
+    renderCallOverlay();
+    startCallPolling();
     showToast('Call connected! 🎙️', 'success');
   } catch (err) {
     showToast('Failed to answer call', 'error');
@@ -1342,6 +1373,10 @@ async function endVoiceCall() {
   if (state.activeCall) {
     API.request(`/calls/end/${state.activeCall.id}`, { method: 'POST' }).catch(() => {});
   }
+  cleanupCallState();
+}
+
+function cleanupCallState() {
   if (state.localStream) {
     state.localStream.getTracks().forEach(t => t.stop());
     state.localStream = null;
@@ -1351,9 +1386,13 @@ async function endVoiceCall() {
     state.peerConnection = null;
   }
   clearInterval(state.callTimerInterval);
+  clearInterval(state.callPollInterval);
+  state.callTimerInterval = null;
+  state.callPollInterval = null;
   state.activeCall = null;
   state.callDuration = 0;
-  render();
+  state.isMuted = false;
+  renderCallOverlay();
 }
 
 function startCallTimer() {
@@ -1361,8 +1400,44 @@ function startCallTimer() {
   state.callDuration = 0;
   state.callTimerInterval = setInterval(() => {
     state.callDuration++;
-    render();
+    const timerEl = document.getElementById('call-timer-text');
+    if (timerEl) {
+      const minutes = Math.floor(state.callDuration / 60).toString().padStart(2, '0');
+      const seconds = (state.callDuration % 60).toString().padStart(2, '0');
+      timerEl.innerText = `${minutes}:${seconds}`;
+    }
   }, 1000);
+}
+
+// Rapid 1.2s Call State Poller (Ensures instant connection transition)
+function startCallPolling() {
+  clearInterval(state.callPollInterval);
+  state.callPollInterval = setInterval(async () => {
+    if (!state.activeCall) return;
+    try {
+      const data = await API.request(`/calls/status/${state.activeCall.chat_id}`);
+      const serverCall = data.activeCall;
+
+      if (!serverCall || serverCall.status === 'ended' || serverCall.status === 'rejected') {
+        showToast('Call ended', 'info');
+        cleanupCallState();
+        return;
+      }
+
+      // If transition from 'ringing' to 'accepted'
+      if (state.activeCall.status === 'ringing' && serverCall.status === 'accepted') {
+        state.activeCall = serverCall;
+        if (serverCall.caller_id === state.user?.id && serverCall.sdp_answer) {
+          if (state.peerConnection && state.peerConnection.signalingState !== 'stable') {
+            await state.peerConnection.setRemoteDescription(new RTCSessionDescription(serverCall.sdp_answer)).catch(() => {});
+          }
+        }
+        startCallTimer();
+        renderCallOverlay();
+        showToast('Call connected! 🎙️', 'success');
+      }
+    } catch (e) {}
+  }, 1200);
 }
 
 // ============================================================
@@ -1666,23 +1741,12 @@ function bindMainEvents() {
     }
   });
 
-  // Audio Voice Calling Events
+  // Start Voice Call
   document.getElementById('btn-start-call')?.addEventListener('click', () => {
     const activeChat = state.chats.find(c => c.id === state.activeChatId);
     const other = !activeChat?.is_group && activeChat?.other_participants ? activeChat.other_participants[0] : null;
     if (other) {
       startVoiceCall(state.activeChatId, other.id);
-    }
-  });
-
-  document.getElementById('btn-accept-call')?.addEventListener('click', () => answerVoiceCall());
-  document.getElementById('btn-decline-call')?.addEventListener('click', () => endVoiceCall());
-  document.getElementById('btn-hangup-call')?.addEventListener('click', () => endVoiceCall());
-  document.getElementById('btn-toggle-mute')?.addEventListener('click', () => {
-    if (state.localStream) {
-      state.isMuted = !state.isMuted;
-      state.localStream.getAudioTracks().forEach(t => { t.enabled = !state.isMuted; });
-      render();
     }
   });
 
@@ -2025,53 +2089,56 @@ function bindMainEvents() {
   });
 }
 
-// 3s Smart Polling & Active Call Monitor
+// Global 2.5s Sync Polling (Messages + Global Incoming Call Check)
 setInterval(async () => {
-  if (state.token) {
-    if (state.activeChatId) {
-      try {
-        const [msgsData, callData] = await Promise.all([
-          API.request(`/messages/${state.activeChatId}`).catch(() => ({})),
-          API.request(`/calls/status/${state.activeChatId}`).catch(() => ({}))
-        ]);
+  if (!state.token) return;
 
-        // Messages update
-        const incoming = msgsData.messages || [];
-        if (incoming.length !== state.activeMessages.length) {
-          const newMsgs = incoming.slice(state.activeMessages.length);
-          state.activeMessages = incoming;
-          render();
-          const container = document.getElementById('messages-container');
-          if (container) container.scrollTop = container.scrollHeight;
-
-          // Notification trigger
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            newMsgs.forEach(msg => {
-              if (msg.sender_id !== state.user?.id) {
-                try {
-                  const notif = new Notification(msg.sender_display_name || 'LogsApp Contact', {
-                    body: msg.message_type !== 'text' ? `📎 Sent a ${msg.message_type}: ${msg.file_name || ''}` : msg.content,
-                    icon: msg.sender_avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=LogsApp'
-                  });
-                  notif.onclick = () => { window.focus(); notif.close(); };
-                } catch (e) {}
-              }
-            });
-          }
-          await loadChats();
-        }
-
-        // Call status update
-        if (callData.activeCall && !state.activeCall) {
-          state.activeCall = callData.activeCall;
-          render();
-        } else if (!callData.activeCall && state.activeCall && state.activeCall.status === 'ringing') {
-          endVoiceCall();
-        }
-      } catch (e) {}
+  // 1. Check for any global incoming call across all chats
+  try {
+    const callRes = await API.request('/calls/incoming').catch(() => ({}));
+    if (callRes.activeCall) {
+      if (!state.activeCall) {
+        state.activeCall = callRes.activeCall;
+        renderCallOverlay();
+        startCallPolling();
+      }
+    } else if (state.activeCall && state.activeCall.status === 'ringing') {
+      // If ringing call was cancelled by caller
+      cleanupCallState();
     }
+  } catch (e) {}
+
+  // 2. Sync Messages for active chat
+  if (state.activeChatId) {
+    try {
+      const msgsData = await API.request(`/messages/${state.activeChatId}`).catch(() => ({}));
+      const incoming = msgsData.messages || [];
+      if (incoming.length !== state.activeMessages.length) {
+        const newMsgs = incoming.slice(state.activeMessages.length);
+        state.activeMessages = incoming;
+        render();
+        const container = document.getElementById('messages-container');
+        if (container) container.scrollTop = container.scrollHeight;
+
+        // Desktop Notification for new messages
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          newMsgs.forEach(msg => {
+            if (msg.sender_id !== state.user?.id) {
+              try {
+                const notif = new Notification(msg.sender_display_name || 'LogsApp Contact', {
+                  body: msg.message_type !== 'text' ? `📎 Sent a ${msg.message_type}: ${msg.file_name || ''}` : msg.content,
+                  icon: msg.sender_avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=LogsApp'
+                });
+                notif.onclick = () => { window.focus(); notif.close(); };
+              } catch (e) {}
+            }
+          });
+        }
+        await loadChats();
+      }
+    } catch (e) {}
   }
-}, 3000);
+}, 2500);
 
 // App Initialization
 (async function init() {
