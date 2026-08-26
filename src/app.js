@@ -1461,15 +1461,91 @@ const rtcConfig = {
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.services.mozilla.com' },
-    { urls: 'stun:stun.relay.metered.ca:80' }
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelay',
+      credential: 'openrelay'
+    }
   ],
   iceCandidatePoolSize: 10
 };
 
 const processedIceCandidates = new Set();
+let pendingLocalIceCandidates = [];
+let pendingRemoteIceCandidates = [];
+let remoteAudioSourceNode = null;
+
+async function sendLocalCandidate(callId, candidate) {
+  try {
+    await API.request(`/calls/ice-candidate/${callId}`, {
+      method: 'POST',
+      body: JSON.stringify({ candidate })
+    });
+  } catch (e) {}
+}
+
+function flushLocalIceCandidates(callId) {
+  if (!callId || pendingLocalIceCandidates.length === 0) return;
+  const toSend = [...pendingLocalIceCandidates];
+  pendingLocalIceCandidates = [];
+  toSend.forEach(cand => sendLocalCandidate(callId, cand));
+}
+
+async function flushRemoteIceCandidates() {
+  if (!state.peerConnection || !state.peerConnection.remoteDescription) return;
+  const toApply = [...pendingRemoteIceCandidates];
+  pendingRemoteIceCandidates = [];
+  for (const cand of toApply) {
+    try {
+      await state.peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+    } catch (e) {}
+  }
+}
+
+function playRemoteAudioStream(stream) {
+  console.log('[WebRTC] Playing remote audio stream:', stream);
+  
+  // 1. Play via HTML5 Audio Element
+  const audioEl = document.getElementById('remote-audio');
+  if (audioEl) {
+    audioEl.srcObject = stream;
+    audioEl.muted = false;
+    audioEl.volume = 1.0;
+    const playPromise = audioEl.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.warn('[WebRTC] HTML5 audio play blocked:', err);
+      });
+    }
+  }
+
+  // 2. Play via WebAudio Context for mobile device speaker routing
+  try {
+    if (sharedAudioCtx && sharedAudioCtx.state !== 'closed') {
+      if (sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume().catch(() => {});
+      }
+      if (!remoteAudioSourceNode) {
+        remoteAudioSourceNode = sharedAudioCtx.createMediaStreamSource(stream);
+        remoteAudioSourceNode.connect(sharedAudioCtx.destination);
+      }
+    }
+  } catch (err) {
+    console.warn('[WebRTC] WebAudio bridge notice:', err);
+  }
+}
 
 async function startVoiceCall(chatId, receiverId) {
   processedIceCandidates.clear();
+  pendingLocalIceCandidates = [];
+  pendingRemoteIceCandidates = [];
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -1479,45 +1555,45 @@ async function startVoiceCall(chatId, receiverId) {
       },
       video: false
     }).catch(err => {
-      console.warn('Microphone error:', err);
+      console.warn('Microphone permission error:', err);
+      showToast('Please allow microphone access in your browser', 'error');
       return null;
     });
 
+    if (!stream) return;
+
+    // Ensure audio tracks enabled
+    stream.getAudioTracks().forEach(t => { t.enabled = true; });
     state.localStream = stream;
     state.peerConnection = new RTCPeerConnection(rtcConfig);
 
-    // Add audio transceiver for bidirectional routing
-    try {
-      state.peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
-    } catch (e) {}
-
-    if (stream) {
-      stream.getTracks().forEach(track => state.peerConnection.addTrack(track, stream));
-    }
+    // Add audio tracks directly (creates sendrecv transceiver automatically)
+    stream.getTracks().forEach(track => {
+      state.peerConnection.addTrack(track, stream);
+    });
 
     state.peerConnection.ontrack = (event) => {
-      console.log('[WebRTC] Remote audio stream received:', event.streams[0]);
-      const audioEl = document.getElementById('remote-audio');
-      if (audioEl && event.streams[0]) {
-        audioEl.muted = false;
-        audioEl.volume = 1.0;
-        audioEl.srcObject = event.streams[0];
-        audioEl.play().catch(e => console.warn('Audio autoplay gesture required:', e));
-      }
+      console.log('[WebRTC] Remote audio track received:', event);
+      const remoteStream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+      playRemoteAudioStream(remoteStream);
     };
 
     state.peerConnection.onicecandidate = (event) => {
-      if (event.candidate && state.activeCall?.id) {
-        API.request(`/calls/ice-candidate/${state.activeCall.id}`, {
-          method: 'POST',
-          body: JSON.stringify({ candidate: event.candidate })
-        }).catch(() => {});
+      if (event.candidate) {
+        if (state.activeCall?.id) {
+          sendLocalCandidate(state.activeCall.id, event.candidate);
+        } else {
+          pendingLocalIceCandidates.push(event.candidate);
+        }
       }
     };
 
+    state.peerConnection.oniceconnectionstatechange = () => {
+      console.log('[WebRTC] ICE Connection State:', state.peerConnection?.iceConnectionState);
+    };
+
     const offer = await state.peerConnection.createOffer({
-      offerToReceiveAudio: true,
-      voiceActivityDetection: true
+      offerToReceiveAudio: true
     });
     await state.peerConnection.setLocalDescription(offer);
 
@@ -1527,6 +1603,8 @@ async function startVoiceCall(chatId, receiverId) {
     });
 
     state.activeCall = data.call;
+    flushLocalIceCandidates(data.call.id);
+
     renderCallOverlay();
     startCallPolling();
     showToast('Calling... 📞', 'info');
@@ -1538,6 +1616,9 @@ async function startVoiceCall(chatId, receiverId) {
 async function answerVoiceCall() {
   if (!state.activeCall) return;
   processedIceCandidates.clear();
+  pendingLocalIceCandidates = [];
+  pendingRemoteIceCandidates = [];
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -1547,43 +1628,44 @@ async function answerVoiceCall() {
       },
       video: false
     }).catch(err => {
-      console.warn('Microphone error:', err);
+      console.warn('Microphone permission error:', err);
+      showToast('Please allow microphone access in your browser', 'error');
       return null;
     });
 
+    if (!stream) return;
+
+    stream.getAudioTracks().forEach(t => { t.enabled = true; });
     state.localStream = stream;
     state.peerConnection = new RTCPeerConnection(rtcConfig);
 
-    try {
-      state.peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
-    } catch (e) {}
-
-    if (stream) {
-      stream.getTracks().forEach(track => state.peerConnection.addTrack(track, stream));
-    }
+    stream.getTracks().forEach(track => {
+      state.peerConnection.addTrack(track, stream);
+    });
 
     state.peerConnection.ontrack = (event) => {
-      console.log('[WebRTC] Remote audio stream received:', event.streams[0]);
-      const audioEl = document.getElementById('remote-audio');
-      if (audioEl && event.streams[0]) {
-        audioEl.muted = false;
-        audioEl.volume = 1.0;
-        audioEl.srcObject = event.streams[0];
-        audioEl.play().catch(e => console.warn('Audio autoplay gesture required:', e));
-      }
+      console.log('[WebRTC] Remote audio track received:', event);
+      const remoteStream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+      playRemoteAudioStream(remoteStream);
     };
 
     state.peerConnection.onicecandidate = (event) => {
-      if (event.candidate && state.activeCall?.id) {
-        API.request(`/calls/ice-candidate/${state.activeCall.id}`, {
-          method: 'POST',
-          body: JSON.stringify({ candidate: event.candidate })
-        }).catch(() => {});
+      if (event.candidate) {
+        if (state.activeCall?.id) {
+          sendLocalCandidate(state.activeCall.id, event.candidate);
+        } else {
+          pendingLocalIceCandidates.push(event.candidate);
+        }
       }
+    };
+
+    state.peerConnection.oniceconnectionstatechange = () => {
+      console.log('[WebRTC] ICE Connection State:', state.peerConnection?.iceConnectionState);
     };
 
     if (state.activeCall.sdp_offer) {
       await state.peerConnection.setRemoteDescription(new RTCSessionDescription(state.activeCall.sdp_offer));
+      await flushRemoteIceCandidates();
     }
 
     const answer = await state.peerConnection.createAnswer({
@@ -1597,6 +1679,8 @@ async function answerVoiceCall() {
     });
 
     state.activeCall = data.call;
+    flushLocalIceCandidates(data.call.id);
+
     stopRingtoneSound();
     startCallTimer();
     renderCallOverlay();
@@ -1616,6 +1700,10 @@ async function endVoiceCall() {
 
 function cleanupCallState() {
   stopRingtoneSound();
+  if (remoteAudioSourceNode) {
+    try { remoteAudioSourceNode.disconnect(); } catch (e) {}
+    remoteAudioSourceNode = null;
+  }
   if (state.localStream) {
     state.localStream.getTracks().forEach(t => t.stop());
     state.localStream = null;
@@ -1629,6 +1717,8 @@ function cleanupCallState() {
     audioEl.srcObject = null;
   }
   processedIceCandidates.clear();
+  pendingLocalIceCandidates = [];
+  pendingRemoteIceCandidates = [];
   clearInterval(state.callTimerInterval);
   clearInterval(state.callPollInterval);
   state.callTimerInterval = null;
@@ -1672,13 +1762,14 @@ function startCallPolling() {
         return;
       }
 
-      // If transition from 'ringing' to 'accepted'
+      // If caller sees transition from 'ringing' to 'accepted'
       if (state.activeCall.status === 'ringing' && serverCall.status === 'accepted') {
         state.activeCall = serverCall;
         stopRingtoneSound();
         if (serverCall.caller_id === state.user?.id && serverCall.sdp_answer) {
-          if (state.peerConnection && state.peerConnection.signalingState !== 'stable') {
+          if (state.peerConnection && state.peerConnection.signalingState === 'have-local-offer') {
             await state.peerConnection.setRemoteDescription(new RTCSessionDescription(serverCall.sdp_answer)).catch(() => {});
+            await flushRemoteIceCandidates();
           }
         }
         startCallTimer();
@@ -1687,14 +1778,18 @@ function startCallPolling() {
       }
 
       // Ingest remote ICE candidates
-      if (iceRes.candidates && state.peerConnection && state.peerConnection.remoteDescription) {
+      if (iceRes.candidates && iceRes.candidates.length > 0 && state.peerConnection) {
         for (const cand of iceRes.candidates) {
           const candKey = JSON.stringify(cand);
           if (!processedIceCandidates.has(candKey)) {
             processedIceCandidates.add(candKey);
-            try {
-              await state.peerConnection.addIceCandidate(new RTCIceCandidate(cand));
-            } catch (err) {}
+            if (state.peerConnection.remoteDescription) {
+              try {
+                await state.peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (err) {}
+            } else {
+              pendingRemoteIceCandidates.push(cand);
+            }
           }
         }
       }
