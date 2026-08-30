@@ -87,13 +87,27 @@ export async function runMigrations() {
     );
   `);
 
-  // 9. Create Indexes
+  // 9. Create cli_transfers table (On-demand single message/file CLI transfers)
+  await query(`
+    CREATE TABLE IF NOT EXISTS cli_transfers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      transfer_code VARCHAR(32) UNIQUE NOT NULL,
+      message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+      created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '24 hours'
+    );
+  `);
+
+  // 10. Create Indexes
   await query(`
     CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
     CREATE INDEX IF NOT EXISTS idx_user_blocks_pair ON user_blocks(blocker_id, blocked_id);
     CREATE INDEX IF NOT EXISTS idx_contact_aliases ON contact_aliases(user_id, contact_id);
     CREATE INDEX IF NOT EXISTS idx_chats_group_royal_id ON chats(group_royal_id);
     CREATE INDEX IF NOT EXISTS idx_calls_chat_status ON calls(chat_id, status);
+    CREATE INDEX IF NOT EXISTS idx_cli_transfers_code ON cli_transfers(transfer_code);
   `);
 
   console.log('Database Migrations completed successfully.');

@@ -142,6 +142,8 @@ const state = {
   showReportModal: null,
   showAliasModal: null,
   showForwardModal: null,
+  showCliTransferModal: null,
+  msgContextMenu: null,
   showChatMenu: false,
   lightboxMedia: null,
 
@@ -166,6 +168,24 @@ export function downloadFileDirect(downloadUrl, filename) {
   a.click();
   document.body.removeChild(a);
   showToast(`Downloading ${filename}...`, 'info');
+}
+
+// On-Demand CLI Transfer Generator
+export async function triggerCliTransfer(msgId) {
+  try {
+    showToast('Generating Linux CLI transfer code... ⚡', 'info');
+    const res = await API.request(`/cli/create-transfer/${msgId}`, { method: 'POST' });
+    if (res && res.command) {
+      try {
+        await navigator.clipboard.writeText(res.command);
+      } catch (e) {}
+      state.showCliTransferModal = res;
+      render();
+      showToast('Linux CLI command copied to clipboard! 📋', 'success');
+    }
+  } catch (err) {
+    showToast(err.message || 'Failed to generate CLI transfer command', 'error');
+  }
 }
 
 // Get contact display name taking user's custom alias into account
@@ -312,7 +332,7 @@ function render() {
       </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Modals & Context Menus -->
     ${state.showProfile ? renderProfileModal() : ''}
     ${state.showGroupModal ? renderGroupModal() : ''}
     ${state.showStorageModal ? renderStorageModal() : ''}
@@ -321,6 +341,8 @@ function render() {
     ${state.showReportModal ? renderReportModal() : ''}
     ${state.showAliasModal ? renderAliasModal() : ''}
     ${state.showForwardModal ? renderForwardModal() : ''}
+    ${state.showCliTransferModal ? renderCliTransferModal() : ''}
+    ${state.msgContextMenu ? renderMsgContextMenu() : ''}
     ${state.lightboxMedia ? renderLightbox() : ''}
   `;
 
@@ -770,10 +792,11 @@ function renderChatArea() {
   </div>`;
 }
 
-// Render Message Bubble with Forward, Delete, and Direct Save Actions
+// Render Message Bubble with Context Menu, CLI Transfer, Forward, Delete, and Direct Save Actions
 function renderMessageBubble(msg, isMe) {
   const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const downloadUrl = `${API.getBaseUrl()}/files/download/${msg.id}`;
+  const hasFile = ['file', 'document', 'archive', 'video', 'audio', 'image'].includes(msg.message_type);
 
   if (msg.is_deleted) {
     return `
@@ -785,13 +808,14 @@ function renderMessageBubble(msg, isMe) {
   }
 
   return `
-  <div class="group flex flex-col my-1.5 ${isMe ? 'items-end' : 'items-start'}">
+  <div class="message-bubble-wrapper group flex flex-col my-1.5 ${isMe ? 'items-end' : 'items-start'}" data-msg-id="${msg.id}" data-has-file="${hasFile}" data-content="${encodeURIComponent(msg.content || '')}" data-filename="${encodeURIComponent(msg.file_name || '')}" data-is-me="${isMe}">
     <div class="relative max-w-[85%] md:max-w-[70%]">
       
-      <!-- Forward / Delete Action Toolbar on Hover -->
+      <!-- Forward / CLI / Delete Action Toolbar on Hover -->
       <div class="absolute -top-3 ${isMe ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} hidden group-hover:flex items-center gap-1 px-2 py-1 ${state.isDark ? 'bg-slate-900/90 border-white/10' : 'bg-white border-slate-200 shadow-md'} border rounded-xl z-20 backdrop-blur-md text-xs">
+        <button class="btn-msg-cli p-1 text-purple-400 hover:text-purple-300" data-msg-id="${msg.id}" title="Copy Linux CLI Transfer Command"><span class="mdi mdi-console-line"></span></button>
         <button class="btn-msg-forward p-1 text-blue-400 hover:text-blue-300" data-msg-id="${msg.id}" title="Forward Message"><span class="mdi mdi-share"></span></button>
-        ${['file', 'document', 'archive', 'video', 'audio', 'image'].includes(msg.message_type) ? `
+        ${hasFile ? `
           <button class="btn-direct-download p-1 text-emerald-400 hover:text-emerald-300" data-url="${downloadUrl}" data-filename="${msg.file_name || 'download'}" title="Save Direct to Device"><span class="mdi mdi-download"></span></button>
         ` : ''}
         ${isMe ? `<button class="btn-msg-delete p-1 text-red-400 hover:text-red-300" data-msg-id="${msg.id}" title="Delete Message"><span class="mdi mdi-delete-outline"></span></button>` : ''}
@@ -822,6 +846,7 @@ function renderMessageBubble(msg, isMe) {
               <p class="font-semibold text-xs truncate text-white">${msg.file_name || 'Attached File'}</p>
               <span class="text-[10px] font-mono text-amber-300">${msg.quick_code ? `QuickCode: ${msg.quick_code}` : '1GB max'}</span>
             </div>
+            <button class="btn-msg-cli p-2 bg-purple-500/30 hover:bg-purple-500/50 text-purple-200 rounded-xl transition-all" data-msg-id="${msg.id}" title="Copy Linux CLI Transfer Command"><span class="mdi mdi-console-line"></span></button>
             <button class="btn-direct-download p-2 bg-blue-500/30 hover:bg-blue-500/50 text-blue-200 rounded-xl transition-all" data-url="${downloadUrl}" data-filename="${msg.file_name || 'download'}" title="Save Direct to Device"><span class="mdi mdi-download"></span></button>
           </div>
         ` : ''}
@@ -1433,6 +1458,128 @@ function renderCLIModal() {
 
       <div class="p-4 ${state.isDark ? 'bg-slate-950/60 border-white/10' : 'bg-slate-100 border-slate-200'} border-t flex justify-end">
         <button id="btn-cli-done" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold shadow-lg shadow-blue-500/25 transition-all">Done</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Message Right-Click Context Menu
+function renderMsgContextMenu() {
+  const menu = state.msgContextMenu;
+  if (!menu) return '';
+  const isMe = menu.isMe;
+  const hasFile = menu.hasFile;
+
+  return `
+  <div id="msg-context-menu-backdrop" class="fixed inset-0 z-50 bg-transparent">
+    <div id="msg-context-menu" class="absolute z-50 min-w-[220px] p-1.5 ${state.isDark ? 'bg-slate-900/95 border-white/10 text-slate-200 shadow-purple-950/40' : 'bg-white/95 border-slate-200 text-slate-800'} rounded-2xl shadow-2xl border backdrop-blur-xl animate-in fade-in zoom-in-95 text-xs font-medium space-y-0.5 select-none" style="top: ${menu.y}px; left: ${menu.x}px;">
+      
+      <!-- CLI Transfer Option (Highlighted) -->
+      <button class="ctx-btn-cli w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-xl bg-gradient-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/35 hover:to-indigo-600/35 text-purple-300 font-semibold border border-purple-500/25 transition-all" data-msg-id="${menu.msgId}">
+        <span class="mdi mdi-console-line text-purple-400 text-sm"></span>
+        <span class="flex-1">CLI Download</span>
+        <span class="text-[9px] bg-purple-500/30 text-purple-200 px-1.5 py-0.5 rounded font-mono">Linux</span>
+      </button>
+
+      <button class="ctx-btn-copy w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-xl hover:bg-white/10 transition-all" data-text="${encodeURIComponent(menu.textContent || '')}">
+        <span class="mdi mdi-content-copy text-sm text-blue-400"></span>
+        <span>Copy Text / Info</span>
+      </button>
+
+      <button class="ctx-btn-forward w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-xl hover:bg-white/10 transition-all" data-msg-id="${menu.msgId}">
+        <span class="mdi mdi-share text-sm text-cyan-400"></span>
+        <span>Forward Message</span>
+      </button>
+
+      ${hasFile ? `
+        <button class="ctx-btn-download w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-xl hover:bg-white/10 transition-all" data-url="${menu.downloadUrl}" data-filename="${encodeURIComponent(menu.fileName || 'download')}">
+          <span class="mdi mdi-download text-sm text-emerald-400"></span>
+          <span>Save to Device</span>
+        </button>
+      ` : ''}
+
+      ${isMe ? `
+        <div class="h-px ${state.isDark ? 'bg-white/10' : 'bg-slate-200'} my-1"></div>
+        <button class="ctx-btn-delete w-full flex items-center gap-2.5 px-3 py-2 text-left rounded-xl hover:bg-red-500/20 text-red-400 transition-all" data-msg-id="${menu.msgId}">
+          <span class="mdi mdi-delete-outline text-sm"></span>
+          <span>Delete for Everyone</span>
+        </button>
+      ` : ''}
+    </div>
+  </div>`;
+}
+
+// On-Demand CLI Transfer Modal
+function renderCliTransferModal() {
+  const data = state.showCliTransferModal;
+  if (!data) return '';
+
+  return `
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-lg p-4 animate-in fade-in">
+    <div class="w-full max-w-xl ${state.isDark ? 'glass-card-dark border-white/10' : 'glass-card-light border-slate-200'} rounded-3xl overflow-hidden modal-enter border shadow-2xl">
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-purple-900/90 via-indigo-900/90 to-slate-950/90 p-5 text-white flex items-center justify-between border-b border-white/10">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 bg-purple-500/20 rounded-2xl border border-purple-500/30">
+            <span class="mdi mdi-console-network text-2xl text-purple-300"></span>
+          </div>
+          <div>
+            <h3 class="font-bold text-base font-heading">Linux CLI Message Downloader</h3>
+            <p class="text-xs text-purple-200 opacity-90">Transfer right-clicked message/file to Linux terminal with username & password.</p>
+          </div>
+        </div>
+        <button id="btn-close-cli-xfr" class="p-1.5 rounded-2xl text-slate-400 hover:text-white"><span class="mdi mdi-close text-lg"></span></button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs">
+        <!-- Item Info -->
+        <div class="p-3.5 ${state.isDark ? 'bg-slate-950/70 border-white/10' : 'bg-slate-100 border-slate-200'} rounded-2xl border flex items-center justify-between">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="mdi ${data.messageType === 'text' ? 'mdi-message-text' : 'mdi-file-document'} text-xl text-purple-400"></span>
+            <div class="truncate">
+              <p class="font-semibold ${state.isDark ? 'text-white' : 'text-slate-900'} truncate">${data.fileName || 'Text Message'}</p>
+              <span class="text-[10px] text-slate-400">${data.fileSizeMb ? `${data.fileSizeMb} MB` : 'Text / Code snippet'}</span>
+            </div>
+          </div>
+          <span class="px-2.5 py-1 bg-purple-500/20 text-purple-300 font-mono font-bold rounded-xl border border-purple-500/30 shrink-0 text-xs">${data.transferCode}</span>
+        </div>
+
+        <!-- 1-Step Universal Linux Terminal Command -->
+        <div>
+          <label class="block font-bold text-purple-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <span class="mdi mdi-bash"></span> 1-Line Universal Terminal Command (Zero Install)
+          </label>
+          <div class="flex items-center justify-between ${state.isDark ? 'bg-slate-950/90 border-purple-500/30' : 'bg-slate-900 text-purple-300 border-slate-800'} p-3.5 rounded-2xl border font-mono text-purple-300 backdrop-blur-md shadow-inner">
+            <span class="truncate select-all text-xs text-purple-200">${data.command}</span>
+            <button class="btn-copy-xfr-cmd px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl ml-2 font-semibold shadow-lg shadow-purple-500/25 transition-all shrink-0 flex items-center gap-1" data-copy="${data.command}">
+              <span class="mdi mdi-content-copy"></span> Copy
+            </button>
+          </div>
+        </div>
+
+        <!-- Or using logsapp CLI -->
+        <div>
+          <label class="block font-semibold ${state.isDark ? 'text-slate-400' : 'text-slate-500'} mb-1 flex items-center gap-1">
+            <span class="mdi mdi-terminal"></span> Or using installed LogsApp CLI:
+          </label>
+          <div class="flex items-center justify-between ${state.isDark ? 'bg-slate-950/60 border-white/10' : 'bg-slate-100 border-slate-200'} p-2.5 px-3.5 rounded-xl border font-mono text-slate-300">
+            <span class="truncate text-xs">${data.cliCommand}</span>
+            <button class="btn-copy-xfr-cmd px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg ml-2 transition-all shrink-0" data-copy="${data.cliCommand}">Copy</button>
+          </div>
+        </div>
+
+        <!-- Step by Step Instructions -->
+        <div class="p-4 ${state.isDark ? 'bg-purple-950/30 border-purple-500/20 text-slate-300' : 'bg-purple-50 border-purple-200 text-slate-700'} rounded-2xl border space-y-1.5 text-[11px] leading-relaxed">
+          <p class="font-bold text-purple-400 flex items-center gap-1"><span class="mdi mdi-information-outline"></span> How it works in Linux:</p>
+          <p>1. Open your terminal on Ubuntu, Debian, Arch, Fedora, Kali, or College Linux Lab.</p>
+          <p>2. Paste the copied command and press <b>Enter</b>.</p>
+          <p>3. Enter your LogsApp <b>Username / RoyalID</b> and <b>Password</b> when prompted.</p>
+          <p>4. The file/message is verified and downloaded straight to your <code class="px-1 py-0.5 bg-black/40 text-purple-300 rounded font-mono">~/Downloads</code> folder!</p>
+        </div>
+      </div>
+
+      <div class="p-4 ${state.isDark ? 'bg-slate-950/60 border-white/10' : 'bg-slate-100 border-slate-200'} border-t flex justify-end">
+        <button id="btn-cli-xfr-done" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl font-semibold shadow-lg shadow-purple-500/25 transition-all">Done</button>
       </div>
     </div>
   </div>`;
@@ -2154,6 +2301,131 @@ function bindMainEvents() {
       const url = btn.getAttribute('data-url');
       const filename = btn.getAttribute('data-filename');
       if (url) downloadFileDirect(url, filename);
+    });
+  });
+
+  // Message Right-Click / Context Menu Handler
+  document.querySelectorAll('.message-bubble-wrapper').forEach(wrapper => {
+    wrapper.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const msgId = wrapper.getAttribute('data-msg-id');
+      const hasFile = wrapper.getAttribute('data-has-file') === 'true';
+      const textContent = decodeURIComponent(wrapper.getAttribute('data-content') || '');
+      const fileName = decodeURIComponent(wrapper.getAttribute('data-filename') || '');
+      const isMe = wrapper.getAttribute('data-is-me') === 'true';
+      const downloadUrl = `${API.getBaseUrl()}/files/download/${msgId}`;
+
+      let x = e.clientX;
+      let y = e.clientY;
+
+      if (x + 230 > window.innerWidth) x = window.innerWidth - 240;
+      if (y + 240 > window.innerHeight) y = window.innerHeight - 250;
+
+      state.msgContextMenu = {
+        x: Math.max(10, x),
+        y: Math.max(10, y),
+        msgId,
+        hasFile,
+        textContent,
+        fileName,
+        isMe,
+        downloadUrl
+      };
+      render();
+    });
+  });
+
+  // Dismiss context menu on backdrop click
+  document.getElementById('msg-context-menu-backdrop')?.addEventListener('click', () => {
+    state.msgContextMenu = null;
+    render();
+  });
+
+  // Context Menu & Toolbar CLI Download Trigger
+  document.querySelectorAll('.ctx-btn-cli, .btn-msg-cli').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      state.msgContextMenu = null;
+      const msgId = btn.getAttribute('data-msg-id');
+      if (msgId) await triggerCliTransfer(msgId);
+    });
+  });
+
+  // Context Menu Copy Text
+  document.querySelectorAll('.ctx-btn-copy').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.msgContextMenu = null;
+      const text = decodeURIComponent(btn.getAttribute('data-text') || '');
+      if (text) {
+        navigator.clipboard.writeText(text);
+        showToast('Message copied to clipboard! 📋', 'success');
+      }
+      render();
+    });
+  });
+
+  // Context Menu Forward
+  document.querySelectorAll('.ctx-btn-forward').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.msgContextMenu = null;
+      const msgId = btn.getAttribute('data-msg-id');
+      const msg = state.activeMessages.find(m => m.id === msgId);
+      if (msg) {
+        state.showForwardModal = msg;
+        render();
+      }
+    });
+  });
+
+  // Context Menu Direct Download
+  document.querySelectorAll('.ctx-btn-download').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.msgContextMenu = null;
+      const url = btn.getAttribute('data-url');
+      const filename = decodeURIComponent(btn.getAttribute('data-filename') || 'download');
+      if (url) downloadFileDirect(url, filename);
+      render();
+    });
+  });
+
+  // Context Menu Delete
+  document.querySelectorAll('.ctx-btn-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      state.msgContextMenu = null;
+      const msgId = btn.getAttribute('data-msg-id');
+      if (!confirm('Delete this message for everyone?')) return;
+      try {
+        await API.request(`/messages/${msgId}`, { method: 'DELETE' });
+        const target = state.activeMessages.find(m => m.id === msgId);
+        if (target) {
+          target.is_deleted = true;
+          target.content = '🚫 This message was deleted';
+        }
+        render();
+        showToast('Message deleted', 'info');
+      } catch (err) {
+        showToast('Failed to delete message', 'error');
+      }
+    });
+  });
+
+  // CLI Transfer Modal Actions
+  document.getElementById('btn-close-cli-xfr')?.addEventListener('click', () => { state.showCliTransferModal = null; render(); });
+  document.getElementById('btn-cli-xfr-done')?.addEventListener('click', () => { state.showCliTransferModal = null; render(); });
+  document.querySelectorAll('.btn-copy-xfr-cmd').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cmd = btn.getAttribute('data-copy');
+      if (cmd) {
+        navigator.clipboard.writeText(cmd);
+        showToast('CLI Command copied to clipboard! 📋', 'success');
+      }
     });
   });
 

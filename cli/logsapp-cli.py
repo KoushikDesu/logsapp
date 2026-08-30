@@ -532,6 +532,140 @@ def cmd_push_dir(args):
     except Exception:
         pass
 
+def cmd_get_msg(args):
+    """Download single message or attachment using right-clicked transfer code (XFR-XXXX)"""
+    session = load_session()
+    server = get_server_url().rstrip('/')
+    code = args.code.upper().strip()
+
+    print(f"\n{Colors.CYAN}{Colors.BOLD}=== LogsApp Message CLI Downloader ==={Colors.RESET}")
+    print(f"Transfer Code: {Colors.YELLOW}{Colors.BOLD}{code}{Colors.RESET}")
+
+    # Check if credentials exist in session or prompt
+    token = session.get("token")
+    user = session.get("user")
+
+    identifier = None
+    password = None
+
+    if not token or not user:
+        print(f"\n{Colors.BOLD}🔐 Authentication Required:{Colors.RESET}")
+        try:
+            identifier = input("Username or RoyalID: ").strip()
+            password = getpass.getpass("Password: ")
+        except Exception:
+            print(f"{Colors.RED}Aborted.{Colors.RESET}")
+            return
+    else:
+        # Prompt password to confirm identity as requested
+        identifier = user.get("username") or user.get("royal_id")
+        print(f"Logged in as: {Colors.BOLD}@{identifier}{Colors.RESET}")
+        try:
+            password = getpass.getpass(f"Enter password to confirm download: ")
+        except Exception:
+            print(f"{Colors.RED}Aborted.{Colors.RESET}")
+            return
+
+    print(f"\n>> Verifying transfer permissions...")
+
+    payload = json.dumps({
+        "transferCode": code,
+        "identifier": identifier,
+        "password": password
+    }).encode('utf-8')
+
+    req = request.Request(
+        f"{server}/api/cli/verify-transfer",
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": "LogsApp-CLI/1.0"},
+        method="POST"
+    )
+
+    try:
+        resp = request.urlopen(req, timeout=30)
+        auth_data = json.loads(resp.read().decode('utf-8'))
+    except error.HTTPError as e:
+        err_body = e.read().decode('utf-8')
+        try:
+            err_json = json.loads(err_body)
+            print(f"{Colors.RED}❌ Authentication failed ({e.code}): {err_json.get('error', err_body)}{Colors.RESET}")
+        except Exception:
+            print(f"{Colors.RED}❌ Error ({e.code}): {err_body}{Colors.RESET}")
+        return
+    except Exception as e:
+        print(f"{Colors.RED}❌ Connection error: {e}{Colors.RESET}")
+        return
+
+    if not auth_data.get("success"):
+        print(f"{Colors.RED}❌ {auth_data.get('error', 'Verification failed')}{Colors.RESET}")
+        return
+
+    # Determine Downloads folder
+    home_dl = Path.home() / "Downloads"
+    if args.output:
+        dest_path = Path(args.output).resolve()
+        if dest_path.is_dir():
+            dest_dir = dest_path
+            filename = auth_data.get("fileName") or f"message_{code}.txt"
+            target_file = dest_dir / filename
+        else:
+            target_file = dest_path
+    else:
+        if home_dl.exists() and home_dl.is_dir():
+            dest_dir = home_dl
+        else:
+            home_dl.mkdir(parents=True, exist_ok=True)
+            dest_dir = home_dl
+        filename = auth_data.get("fileName") or f"message_{code}.txt"
+        target_file = dest_dir / filename
+
+    is_attachment = auth_data.get("isAttachment", False)
+
+    if is_attachment:
+        dl_url = f"{server}/api/cli/download-transfer/{code}?token={auth_data['token']}"
+        print(f">> Downloading {Colors.BOLD}{target_file.name}{Colors.RESET} to {target_file.parent}...")
+
+        try:
+            dl_req = request.Request(dl_url, headers={"User-Agent": "LogsApp-CLI/1.0"})
+            dl_resp = request.urlopen(dl_req, timeout=300)
+            total_bytes = int(dl_resp.headers.get("Content-Length", 0))
+            total_mb = total_bytes / (1024 * 1024) if total_bytes > 0 else 0
+
+            chunk_size = 64 * 1024
+            downloaded = 0
+            start_time = time.time()
+
+            with open(target_file, 'wb') as f:
+                while True:
+                    chunk = dl_resp.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_bytes > 0:
+                        pct = (downloaded / total_bytes) * 100
+                        bar_len = 30
+                        filled = int(bar_len * downloaded // total_bytes)
+                        bar = '=' * filled + '-' * (bar_len - filled)
+                        elapsed = max(time.time() - start_time, 0.001)
+                        speed = (downloaded / (1024*1024)) / elapsed
+                        sys.stdout.write(f"\r  [{bar}] {pct:.1f}% ({downloaded/(1024*1024):.1f}/{total_mb:.1f} MB) @ {speed:.2f} MB/s ")
+                        sys.stdout.flush()
+
+            print(f"\n\n{Colors.GREEN}{Colors.BOLD}🎉 Success! Downloaded to:{Colors.RESET}")
+            print(f"   {Colors.CYAN}{os.path.abspath(target_file)}{Colors.RESET}\n")
+        except Exception as e:
+            print(f"\n{Colors.RED}❌ Download failed: {e}{Colors.RESET}")
+    else:
+        content = auth_data.get("content", "")
+        with open(target_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"\n{Colors.CYAN}{Colors.BOLD}--- Message Content ---{Colors.RESET}")
+        print(content)
+        print(f"{Colors.CYAN}{Colors.BOLD}-----------------------{Colors.RESET}\n")
+        print(f"{Colors.GREEN}{Colors.BOLD}🎉 Saved message text to:{Colors.RESET}")
+        print(f"   {Colors.CYAN}{os.path.abspath(target_file)}{Colors.RESET}\n")
+
 def main():
     parser = argparse.ArgumentParser(description="LogsApp / RoyalChat - Linux Terminal Client")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -589,6 +723,11 @@ def main():
     p_get.add_argument("code", help="6-digit QuickCode (e.g. LGS-8492) or File ID")
     p_get.add_argument("output", nargs="?", help="Output file path destination")
 
+    # get-msg (Download single message or file using transfer code XFR-XXXX)
+    p_gmsg = subparsers.add_parser("get-msg", help="Download a message or attachment using right-clicked Transfer Code (e.g. XFR-8492)")
+    p_gmsg.add_argument("code", help="Transfer Code (e.g. XFR-8492)")
+    p_gmsg.add_argument("output", nargs="?", help="Optional custom destination path")
+
     args = parser.parse_args()
 
     if args.command == "login":
@@ -613,6 +752,8 @@ def main():
         cmd_files(args)
     elif args.command == "get":
         cmd_download(args)
+    elif args.command == "get-msg":
+        cmd_get_msg(args)
     else:
         print_banner()
         parser.print_help()
